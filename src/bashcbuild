@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# bashcbuild - builds a package
+# https://github.com/
+#
+# Copyright (C) GRyCAP - I3M - UPV 
+# Developed by Carlos A. caralla@upv.es
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+function usage() {
+  cat <<EOF
+
+this is a tool that runs ...
+
+$0 <options>
+
+  --version | -V            Shows the version number and finalizes.
+  --verbose | -v            Shows more information about the procedure.
+  --debug                   Shows a lot more information about the procedure.
+  --help | -h               Shows this help and exits.
+EOF
+}
+
+function verify_dependencies() {
+  if false; then
+    finalize 1 "dependency failed"
+  fi
+}
+
+# Some basic includes
+source lib/debug.bash
+source lib/temp.bash
+source lib/utils.bash
+source lib/config.bash
+source version
+
+# Parse the commandline into an array
+commandline_to_array ARR "$@"
+
+n=0
+while [ $n -lt ${#ARR[@]} ]; do
+    PARAM="${ARR[$n]}"
+    case "$PARAM" in
+        --verbose|-v)           VERBOSE=true;;
+        --debug)                DEBUG=true;;
+        --version | -V)         echo "$VERSION" && finalize;;
+        --help | -h)            usage && finalize;;
+        *)                      usage && finalize 1 "invalid parameter $PARAM";;
+    esac
+    n=$(($n+1))
+done
+
+verify_dependencies
