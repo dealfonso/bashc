@@ -1,0 +1,108 @@
+#!/bin/bash
+#
+# bashcgen - creates a basic bashc application based on a template
+# https://github.com/
+#
+# Copyright (C) GRyCAP - I3M - UPV 
+# Developed by Carlos A. caralla@upv.es
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+function usage() {
+  cat <<EOF
+
+This tool creates a template for an application
+
+$0 <appname>
+
+  --folder | -f <folder>    Sets the folder in which the template is being created
+                            (default: ./appname)
+  --template | -t <name>    Makes use of the template named <name> (default: bash)
+  --license | -l <license>  Includes the license and license notices named <license> 
+                            (default: apache2)
+  --version | -V            Shows the version number and finalizes.
+  --verbose | -v            Shows more information about the procedure.
+  --debug                   Shows a lot more information about the procedure.
+  --help | -h               Shows this help and exits.
+EOF
+}
+
+function verify_dependencies() {
+  if false; then
+    bashc.finalize 1 "dependency failed"
+  fi
+}
+
+# Some basic includes
+source lib/debug.bash
+source lib/temp.bash
+source lib/utils.bash
+source lib/config.bash
+source version
+
+# Parse the commandline into an array
+bashc.commandline_to_array ARR "$@"
+
+function bashc.hello() {
+  echo "hello world"
+}
+
+function nextparam() {
+  n=$((n+1))
+  PARAM="${ARR[$n]}"
+}
+
+FOLDER=
+APPNAME=
+
+n=0
+while [ $n -lt ${#ARR[@]} ]; do
+    PARAM="${ARR[$n]}"
+    case "$PARAM" in
+        --folder|-f)            nextparam
+                                FOLDER="$PARAM";;
+        --template|-t)          bashc.finalize 1 "template usage not implemented";;
+        --license|-l)           bashc.finalize 1 "license usage not implemented";;
+        --verbose|-v)           VERBOSE=true;;
+        --debug)                DEBUG=true;;
+        --version | -V)         echo "$VERSION" && bashc.finalize;;
+        --help | -h)            usage && bashc.finalize;;
+        *)                      if [ "$APPNAME" == "" ]; then
+                                  APPNAME="$PARAM"
+                                else
+                                  usage && bashc.finalize 1 "invalid parameter $PARAM"
+                                fi;;
+    esac
+    n=$(($n+1))
+done
+
+verify_dependencies
+
+if [ "$APPNAME" == "" ]; then
+  bashc.finalize 1 "no appname set"
+fi
+
+if [[ ! "$APPNAME" =~ ^[A-Za-z0-9]*$ ]]; then
+  bashc.finalize 1 "the name $APPNAME is not a valid name for an application"
+fi
+
+if [ "$FOLDER" == "" ]; then
+  FOLDER="./$APPNAME"
+fi
+
+if [ -d "$FOLDER" ]; then
+  bashc.finalize 1 "folder $FOLDER already exists"
+fi
+
+p_debug "creating app $APPNAME in folder $FOLDER"
