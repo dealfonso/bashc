@@ -38,7 +38,7 @@ function p_info() {
   local L
   if [ "$VERBOSE" == "true" ]; then
     local TS="$(date +%Y.%m.%d-%X)"
-    while read L; do
+    while read; do
       p_errfile "[INFO] $LOGGER $TS $@"
     done <<< "$@"
   fi
@@ -46,7 +46,7 @@ function p_info() {
 
 function p_out() {
   if [ "$QUIET" != "true" ]; then
-    while read L; do
+    while read; do
       echo "$@"
     done <<< "$@"
   fi
@@ -56,8 +56,8 @@ function p_debug() {
   local L
   if [ "$DEBUG" == "true" ]; then
     local TS="$(date +%Y.%m.%d-%X)"
-    while read L; do
-      p_errfile "[DEBUG] $LOGGER $TS $L"
+    while read; do
+      p_errfile "[DEBUG] $LOGGER $TS $REPLY"
     done <<< "$@"
   fi
 }

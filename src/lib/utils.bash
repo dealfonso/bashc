@@ -6,6 +6,20 @@ function bashc.trim() {
   echo "$A"
 }
 
+function bashc.ltrim() {
+  shopt -s extglob
+  local A="${1##+([[:space:]])}"
+  shopt -u extglob
+  echo "$A"
+}
+
+function bash.rtrim() {
+  shopt -s extglob
+  local A="${1%%+([[:space:]])}"
+  shopt -u extglob
+  echo "$A"
+}
+
 function bashc.build_cmdline() {
   local SHCMDLINE=""
   while [ $# -gt 0 ]; do
@@ -17,6 +31,76 @@ function bashc.build_cmdline() {
     shift
   done
   echo "$SHCMDLINE"
+}
+
+function bashc.dump_list() {
+  # Usage:
+  # bashc.dump_list "${ARRNAME[@]}"
+  local n=0
+  while [ $# -gt 0 ]; do
+    p_debug "$n: $1"
+    shift
+    n=$((n+1))
+  done
+}
+
+function bashc.parameters_to_list() {
+  # Usage:
+  #  bashc.parameters_to_list ARRNAME p1 p2 p3 p4
+  # Effect:
+  #  ARRNAME
+  local AN="$1"
+  local n=0
+  shift
+  eval "$AN=( )"
+  while [ $# -gt 0 ]; do
+    read ${AN}[$n] <<< "$1"
+    n=$((n+1))
+    shift
+  done
+}
+
+function bashc.list_append() {
+  # Usage:
+  #  bashc.parameters_to_list ARRNAME p1 p2 p3 p4
+  # Effect:
+  #  ARRNAME
+  local AN="$1"
+  local SIZE=$(eval "echo \${#$AN[@]}")
+  local n
+  shift
+  if bashc.is_int "$SIZE"; then
+    n=$SIZE
+    while [ $# -gt 0 ]; do
+      read ${AN}[$n] <<< "$1"
+      n=$((n+1))
+      shift
+    done
+  fi
+}
+
+function bashc.in_list() {
+  # Usage:
+  #  bashc.in_list ARRNAME <elem>
+  local AN="$1"
+  local SIZE=$(eval "echo \${#$AN[@]}")
+  local T n
+  if bashc.is_int "$SIZE"; then
+    for ((n=0;n<SIZE;n=n+1)); do 
+      T="$AN[$n]"
+      if [ "${!T}" == "$2" ]; then
+        return 0
+      fi
+    done
+  fi
+  return 1
+}
+
+function bashc.is_int() {
+  if [[ "$1" =~ ^[+-]{0,1}[0-9]+$ ]]; then
+    return 0
+  fi
+  return 1
 }
 
 function bashc.arrayze_cmd() {

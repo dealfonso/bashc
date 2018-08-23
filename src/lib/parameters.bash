@@ -20,7 +20,7 @@ function bashc.parameters_end() {
   return 0
 }
 
-function bashc.parameter_current() {
+function bashc.parameters_current() {
   echo "${_BASHC_COMMANDLINE_ARRAY[$_BASHC_current_param_id]}"
 }
 
