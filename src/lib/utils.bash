@@ -62,7 +62,7 @@ function bashc.parameters_to_list() {
 
 function bashc.list_append() {
   # Usage:
-  #  bashc.parameters_to_list ARRNAME p1 p2 p3 p4
+  #  bashc.list_append ARRNAME p1 p2 p3 p4
   # Effect:
   #  ARRNAME
   local AN="$1"
