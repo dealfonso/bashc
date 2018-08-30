@@ -35,20 +35,17 @@ function p_warning() {
 }
 
 function p_info() {
-  local L
-  if [ "$VERBOSE" == "true" ]; then
-    local TS="$(date +%Y.%m.%d-%X)"
-    while read; do
-      p_errfile "[INFO] $LOGGER $TS $@"
-    done <<< "$@"
+  if [ "$VERBOSE" == "true" -o "$DEBUG" == "true" ]; then
+    local O_STR="[INFO] $LOGGER $(date +%Y.%m.%d-%X) $@"
+    p_errfile "$O_STR"
   fi
 }
 
 function p_out() {
   if [ "$QUIET" != "true" ]; then
-    while read; do
+    #while read; do
       echo "$@"
-    done <<< "$@"
+    #done <<< "$@"
   fi
 }
 
@@ -56,9 +53,10 @@ function p_debug() {
   local L
   if [ "$DEBUG" == "true" ]; then
     local TS="$(date +%Y.%m.%d-%X)"
-    while read; do
-      p_errfile "[DEBUG] $LOGGER $TS $REPLY"
-    done <<< "$@"
+    p_errfile "[DEBUG] $LOGGER $TS $@"
+    #while read; do
+    #  p_errfile "[DEBUG] $LOGGER $TS $REPLY"
+    #done <<< "$@"
   fi
 }
 
