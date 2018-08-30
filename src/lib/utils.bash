@@ -132,3 +132,7 @@ function bashc.sanitize() {
   echo "$1" | sed -e 's/\([[\/.*]\|\]\)/\\&/g'
 }
 
+function bashc.cleanfile() {
+  # This function removes the comments, the starting and trailing whitespaces of lines and removes blank lines o a file
+  cat "$1" | sed 's/#.*//g' | sed 's/^[ \t]*//g' | sed 's/[ \t]*$//g' | sed '/^$/d'
+}
