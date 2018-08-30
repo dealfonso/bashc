@@ -21,7 +21,7 @@ function bashc.parameters_end() {
 }
 
 function bashc.parameters_current() {
-  echo "${_BASHC_COMMANDLINE_ARRAY[$_BASHC_current_param_id]}"
+  printf "%s" "${_BASHC_COMMANDLINE_ARRAY[$_BASHC_current_param_id]}"
 }
 
 function bashc.parameter_parse_commandline() {
