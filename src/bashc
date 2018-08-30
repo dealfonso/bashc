@@ -148,9 +148,6 @@ function strip_fnc() {
       in_squote=0;
       in_dquote=0;
     }
-    /^[ \t]*$/{ # Remove empty lines
-      next;
-    }
     $RESTOFCODE
     1 # Print line"
 }
