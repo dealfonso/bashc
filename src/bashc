@@ -67,6 +67,13 @@ function strip_fnc() {
     infunction {
       analized_str=$0;
       
+      if (in_heredoc!="")
+        if (analized_str ~ "^" in_heredoc "[[:blank:]]*$") {
+          in_heredoc=""
+          # Jump the matched delimiter
+          next
+        }
+
       # if in double quote, remote anything up othe double quote
       if (in_dquote==1)
         if (sub(/^[^"\\]*(\\.[^"\\]*)*"/,"", analized_str)) in_dquote=0;
@@ -76,7 +83,11 @@ function strip_fnc() {
         if (sub(/^[^'"'"']*'"'"'/,"", analized_str)) in_squote=0;
 
       # if still in double quote or single quote, skip
-      if (in_dquote || in_squote) next;
+      if (in_dquote || in_squote || in_heredoc != "") next;
+
+      # Remove regex
+      # while (sub(/\[\[ ([^[\[]|\[[^\[])* \]\]/, "[[ ]]", analized_str));
+      while (sub(/\[\[ ([^\[]|\[[^\[])* \]\]/, "[[ ]]", analized_str));
 
       # Remove quoted sentences
       while (sub(/"[^"\\]*(\\.[^"\\]*)*"|'"'"'[^'"'"']*'"'"'/,"",analized_str));
@@ -89,10 +100,14 @@ function strip_fnc() {
       if (i_squote == 0) i_squote=length(analized_str);
       if (i_dquote == 0) i_dquote=length(analized_str);
 
+      # Remove variable expressions (e.g. ${VAR}, ${#VAR[@]}, etc.)
+      sub(/\${[^}{]*}/,"", analized_str)
+
       if (i_comment <= i_squote && i_comment <= i_dquote) {
         # Remove comments (beware of the {#arr[@]} bash expansion)
-        sub(/[^{]#.*$/,"",analized_str);
+        sub(/#.*$/,"",analized_str);
       }
+
       if (i_squote <= i_dquote) {
         if (sub(/'"'"'[^'"'"']*$/,"", analized_str)) 
           in_squote=1;
@@ -103,6 +118,11 @@ function strip_fnc() {
           in_dquote=1;
         if (sub(/'"'"'[^'"'"']*$/,"", analized_str)) 
           in_squote=1;
+      }
+
+      if (match(analized_str, /<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+)/, matched)) {
+        in_heredoc=matched[2];
+        sub(/<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+).*$/,"", analized_str);
       }
 
       # If it is empty, skip
@@ -237,7 +257,7 @@ cd "$WORKINGFOLDER" || bashc.finalize 1 "not valid working folder $WORKINGFOLDER
 # Read the config files
 for F in $CONFIGFILES; do
   p_debug "processing file configuration file $F"
-  bashc.readconf "$F" BASHC_LIB_PATH
+  bashc.readconffile "$F" BASHC_LIB_PATH
   RESULT=$?
   if [ $RESULT -eq 255 ]; then
     p_debug "configuration file $F does not exist"
