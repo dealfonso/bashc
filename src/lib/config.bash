@@ -28,16 +28,8 @@ function bashc.Xreadconf() {
   return 0
 }
 
-function bashc.readconf() {
-  local _CONF_FILE=$1
-  local _TXT_CONF
-  local _CURRENT_KEY _CURRENT_VALUE
-  local L
-  local _VALID_KEYS=( )
-
-  # Now read the valid keys
-  shift
-  bashc.list_append _VALID_KEYS "$@"
+function bashc.readconffile() {
+  local _CONF_FILE="$1"
 
   # If the config file does not exist return failure
   if [ ! -e "$_CONF_FILE" ]; then
@@ -46,6 +38,20 @@ function bashc.readconf() {
 
   # First we read the config file
   _TXT_CONF="$(cat "$_CONF_FILE" | sed 's/^[ \t]*//g' | sed 's/[ \t]*$//g' | sed '/^$/d')"
+
+  bashc.readconf "$_TXT_CONF" "$@"
+  return $?
+}
+
+function bashc.readconf() {
+  local _TXT_CONF="$1"
+  local _CURRENT_KEY _CURRENT_VALUE
+  local L
+  local _VALID_KEYS=( )
+
+  # Now read the valid keys
+  shift
+  bashc.list_append _VALID_KEYS "$@"
 
   local _EXITCODE=0
   # Let's read the lines
@@ -59,8 +65,10 @@ function bashc.readconf() {
       else
         _CURRENT_VALUE="$(echo "$_CURRENT_VALUE" | envsubst)"
         if [ ${#_VALID_KEYS[@]} -eq 0 ] || bashc.in_list _VALID_KEYS $_CURRENT_KEY; then
-          p_debug "$_CURRENT_KEY value acquired"
           read -d '\0' "$_CURRENT_KEY" <<< "${_CURRENT_VALUE}"
+
+          # The value is exported so that it is available for the others subprocesses
+          export $_CURRENT_KEY
         else
           p_warning "$_CURRENT_KEY ignored"
         fi

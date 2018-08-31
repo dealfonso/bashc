@@ -1,0 +1,52 @@
+# The format of a bashcbuild file consists in declaring variables (allowed by bashcbuild). And build commands.
+#
+# These variables are used to create RPM and DEB packages. If you do not need them, you can simply declare the essential
+#   variable PACKAGE and not including the other variables. VERSION is also recommended.
+# The next lines are the example for the **bashc** package:
+PACKAGE=bashc
+VERSION=0.1-1
+SUMMARY="BASHc is similar to a compiler for bash applications"
+LICENSE="Apache 2.0"
+URL="https://github.com/dealfonso/bashc"
+DESCRIPTION="This is a tool that tries to flatten bash applications. It is useful if you use source statements\
+  to organize your files. In this case, this tool will make a single file with no outern dependencies.\
+  The sourced files are searched in the folders that are included in the BASHC_LIB_PATH configuration\
+  variable. It is expressed in a PATH-like syntax. The value for BASHC_LIB_PATH is obtained from the \
+  env variables and later from the configuration files. The default value is '.'. \
+  The application also includes one tool to try to remove unused functions (strip-functions). This \
+  is useful to create libraries with a lot of funcions in it, but only include those that are used in\
+  the resulting application. More info at $URL"
+PACKAGER="Carlos de Alfonso <caralla@upv.es>"
+# DEPENDS is for DEB packages
+DEPENDS="bash, tar, coreutils, gettext-base, gawk"
+# REQUIRES is for RPM packages
+REQUIRES="bash tar coreutils gawk"
+
+# You can also include "build lines" with the format
+#   <destination folder>;<files:using:path:format>;<commands to execute for those files prior to copy them to the destination folder>
+# It is easier to learn by example:
+
+# This line copies the folder "lib" and the files "version" and "LICENSE" to the /usr/share/$PACKAGE folder. 
+#   We used $PACKAGE variable to demonstrate the variable substitution ability for this file.
+#   In our application, /usr/share/bashc/ will be the main folder.
+/usr/share/$PACKAGE/;lib:version:LICENSE
+
+# We have the following built-in variables: 
+# - SOURCEFOLDER: the folder in which we are building (the source folder for the package)
+# - TMPDIR: a temporary folder created for the package building
+# - FILENAME: the name of the file which triggers the execution
+# - BUILDFOLDER: the folder in which we are building the package (the destination folders will be inside that folder) 
+# We will also be able to use the other variables that we are defining in this file.
+
+# This line copies the files in the ./etc/ folder to folder /etc/$PACKAGE (/etc/bashc)
+/etc/$PACKAGE/;etc/*
+
+# This is a complex example: we need to execute some commands to generate the files that we'll copy in the final folder
+#   * We can leave the <destination folder> in blank, so that we match files in the building folder and execute commands
+# In our case, we have 3 files (bashc, bashcbuild and bashcgen) and we want to run bashc over them, generate the REAL 
+#   executable files and leave them in a temporary folder $TMPDIR. We also need that the resulting files are marked as 
+#   executables (chmod +x)
+;bashc:bashcbuild:bashcgen;./bashc -o $TMPDIR/$FILENAME -cCS $SOURCEFOLDER/$FILENAME;chmod +x $TMPDIR/$FILENAME
+
+# Finally, this line copies the REAL binaries that we generated in the previous step to the /usr/bin folder (in the package).
+/usr/bin/;$TMPDIR/bashc:$TMPDIR/bashcbuild:$TMPDIR/bashcgen

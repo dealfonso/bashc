@@ -22,14 +22,62 @@
 function usage() {
   cat <<EOF
 
-this is a tool that runs ...
+This is a tool that builds a package from a file descriptor. It is able to create .tar.gz, rpm and deb packages.
 
-$0 <options>
+$0 <options> <package description>
 
+  --rpm                     Generate a RPM package
+  --deb                     Generate a DEB package
+  --package-name| -N <package name>       
+                            Sets the package name (it is used to create the filenames)
+  --output-folder | -o <folder>
+                            Leave the resulting files in folder <folder>. The folder must exist.
+  --keep-temporary | -T     Do not remove the temporary folder for the building (folder in var TMPDIR)
+  --keep-buildfolder | -k   Do not remove the temporary folder used to build the package
+  --halt-on-errors | -H     Halt if error occurrs
+  --no-execute | -n         Do not execute the commands in the description file
   --version | -V            Shows the version number and finalizes.
   --verbose | -v            Shows more information about the procedure.
   --debug                   Shows a lot more information about the procedure.
   --help | -h               Shows this help and exits.
+
+  The tool needs a file that describes what is included inside the package and where. The format is very simple:
+  <destination folder (relative to /)>;<files or folders that will be copied>;<commands that will be executed for each file>;<command...>
+  
+  E.g.
+
+  /usr/bin;myexecutable:myotherexe
+
+  * will copy myexecutable and myotherexe to /usr/bin folder (inside the package)
+
+  E.g.
+
+  ;myexecutable:myotherexe;chmod +x $FILENAME
+
+  * will chmod +x each file
+
+  The tool also accepts variable substitution (e.g. $FILENAME in the example). The built-in variables are the next:
+
+    + SOURCEFOLDER: the folder in which we are building (the source folder for the package)
+    + TMPDIR: a temporary folder created for the package building
+    + FILENAME: the name of the file which triggers the execution
+    + PACKAGE: the name of the package
+    + BUILDFOLDER: the folder in which we are building the package (the destination folders will be inside that folder) 
+
+  It is also possible to include variable definitions inline, just by declaring them.
+
+  To be able to create RPM and DEB packages, you MUST define the next variables:
+
+    NAME=bashc
+    SUMMARY="BASHc is similar to a compiler for bash applications"
+    LICENSE="Apache 2.0"
+    URL="https://github.com/dealfonso/bashc"
+    DESCRIPTION="This is a tool that tries to flatten bash applications. More info at $URL"
+    PACKAGER="Carlos de Alfonso <caralla@upv.es>"
+    # DEPENDS is for DEB packages
+    DEPENDS="bash, tar, coreutils, gettext-base, gawk"
+    # REQUIRES if for RPM packages
+    REQUIRES="bash tar coreutils gawk"
 EOF
 }
 
@@ -39,27 +87,488 @@ function verify_dependencies() {
   fi
 }
 
+function build_deb() {
+  local BUILDFOLDER="$1"
+  local PACKAGE="$2"
+  local VERSION="$3"
+
+  local REVISION=${VERSION##*-}
+
+  if [ "$REVISION" == "$VERSION" ]; then
+    REVISION="0"
+  fi
+
+  VERSION=${VERSION%%-*}
+
+  p_debug "version: $VERSION revision: $REVISION"
+
+  if [ "$TMPDIR" == "" ]; then
+    TMPDIR="$(bashc.tempdir)"
+  fi
+
+  p_debug "building package from $BUILDFOLDER"
+
+  cp -r "$BUILDFOLDER" "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+
+  PACKAGEBUILD="${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+  mkdir -p "${PACKAGEBUILD}/DEBIAN"
+
+  cat > "${PACKAGEBUILD}/DEBIAN/control" << EOF
+Package: ${PACKAGE}
+Version: ${VERSION}-${REVISION}
+Section: base
+Priority: optional
+Architecture: all
+EOF
+  if [ "$DEPENDS" != "" ]; then
+    echo "Depends: ${DEPENDS}" >> "${PACKAGEBUILD}/DEBIAN/control"
+  fi
+  if [ "$PACKAGER" != "" ]; then
+    echo "Maintainer: ${PACKAGER}" >> "${PACKAGEBUILD}/DEBIAN/control"
+  fi
+  if [ "$DESCRIPTION" != "" ]; then
+    cat >> "${PACKAGEBUILD}/DEBIAN/control" << EOF
+Description: ${PACKAGE}
+$(echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}')
+EOF
+  fi
+
+  cat > "${PACKAGEBUILD}/DEBIAN/preinst" <<\EOF
+#!/bin/sh
+EOF
+
+  cat > "${PACKAGEBUILD}/DEBIAN/postinst" <<\EOF
+#!/bin/sh
+EOF
+
+  cat > "${PACKAGEBUILD}/DEBIAN/postrm" <<\EOF
+#!/bin/sh
+EOF
+
+  cat > "${PACKAGEBUILD}/DEBIAN/prerm" <<\EOF
+#!/bin/sh
+EOF
+
+  chmod +x "${PACKAGEBUILD}/DEBIAN/postinst"
+  chmod +x "${PACKAGEBUILD}/DEBIAN/postrm"
+  chmod +x "${PACKAGEBUILD}/DEBIAN/preinst"
+  chmod +x "${PACKAGEBUILD}/DEBIAN/prerm"
+
+  pushd $PACKAGEBUILD/etc > /dev/null 2> /dev/null
+  [ $? -eq 0 ] && CONFFILES="$(find * -type f -printf '/etc/%p\n')" && popd > /dev/null
+
+  if [ "$CONFFILES" != "" ]; then
+    echo "$CONFFILES" > "${PACKAGEBUILD}/DEBIAN/conffiles"
+  fi
+
+  pushd "${PACKAGEBUILD}" > /dev/null 2> /dev/null
+  find . -type f ! -regex '.*.hg.*' ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf "\"%P\" " | xargs md5sum > "DEBIAN/md5sums"
+  popd > /dev/null 2> /dev/null
+
+  fakeroot dpkg-deb --build "${PACKAGEBUILD}" > /dev/null 2> /dev/null
+  if [ $? -eq 0 ]; then
+    echo "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}.deb"
+  else
+    return 1
+  fi
+  return 0
+}
+
+function build_rpm() {
+  local BUILDFOLDER="$1"
+  local PACKAGE="$2"
+  local VERSION="$3"
+
+  local REVISION=${VERSION##*-}
+
+  if [ "$REVISION" == "$VERSION" ]; then
+    REVISION="0"
+  fi
+
+  VERSION=${VERSION%%-*}
+
+  p_debug "version: $VERSION revision: $REVISION"
+
+  if [ "$TMPDIR" == "" ]; then
+    TMPDIR="$(bashc.tempdir)"
+  fi
+
+  p_debug "building package from $BUILDFOLDER"
+
+  cp -r "$BUILDFOLDER" "${TMPDIR}/${PACKAGE}-${VERSION}"
+
+  tar czf ${TMPDIR}/${PACKAGE}-${VERSION}.tar.gz -C "$TMPDIR" ${PACKAGE}-${VERSION}
+  local TARFILES="$(tar tf ${TMPDIR}/${PACKAGE}-${VERSION}.tar.gz | sed "s/${PACKAGE}-${VERSION}//g" | sed '/\/$/d')"
+
+  cat > ${TMPDIR}/${PACKAGE}.spec <<EOF
+%define version $VERSION
+%define revision $REVISION
+Summary:        bashkeleton - skeleton of a bash application
+License:        Apache 2.0
+Name:           ${PACKAGE}
+EOF
+
+  if [ "$URL" != "" ]; then
+    echo "URL:            $URL" >> ${TMPDIR}/${PACKAGE}.spec
+  fi
+  if [ "$PACKAGER" != "" ]; then
+    echo "Packager:       $PACKAGER" >> ${TMPDIR}/${PACKAGE}.spec
+  fi
+  if [ "$REQUIRES" != "" ]; then
+    echo "Requires:       $REQUIRES" >> ${TMPDIR}/${PACKAGE}.spec
+  fi
+
+  cat >> ${TMPDIR}/${PACKAGE}.spec <<\EOF
+Version:        %{version}
+Release:        %{revision}
+Group:          System Environment
+Source0:        %{name}-%{version}.tar.gz
+BuildArch:      noarch
+%description
+EOF
+  if [ "$DESCRIPTION" != "" ]; then
+    echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}' >> ${TMPDIR}/${PACKAGE}.spec
+  fi
+  cat >> ${TMPDIR}/${PACKAGE}.spec <<\EOF
+%prep
+%setup -q
+%build
+%install
+mkdir -p $RPM_BUILD_ROOT
+cp -r * $RPM_BUILD_ROOT
+%clean
+rm -rf $RPM_BUILD_ROOT
+%post
+%postun
+EOF
+  cat >> ${TMPDIR}/${PACKAGE}.spec <<EOF
+%files
+%defattr(-,root,root,755)
+$(echo "$TARFILES" | grep -v '^/etc' | grep '/bin/' | awk '{printf "\"%s\"\n", $0}')
+%defattr(-,root,root,644)
+$(echo "$TARFILES" | grep -v '^/etc' | grep -v '/bin/' | awk '{printf "\"%s\"\n", $0}')
+EOF
+
+  if [ "$(ls $BUILDFOLDER/etc)" != "" ]; then
+    cat >> ${TMPDIR}/${PACKAGE}.spec <<EOF
+%config
+$(echo "$TARFILES" | grep '^/etc' | grep -v '/bin/' | awk '{printf "\"%s\"\n", $0}')
+EOF
+  fi
+
+  mkdir -p ~/rpmbuild/SOURCES/
+  cp ${TMPDIR}/${PACKAGE}-${VERSION}.tar.gz ~/rpmbuild/SOURCES/
+  rpmbuild -ba ${TMPDIR}/${PACKAGE}.spec > /dev/null 2> /dev/null
+
+  if [ $? -eq 0 ]; then
+    echo ~/rpmbuild/RPMS/noarch/${PACKAGE}-${VERSION}-${REVISION}.noarch.rpm
+  else
+    return 1
+  fi
+  return 0
+}
+
+function build_tar() {
+  local BUILDFOLDER="$1"
+  local PACKAGE="$2"
+  local VERSION="$3"
+
+  local REVISION=${VERSION##*-}
+
+  if [ "$REVISION" == "$VERSION" ]; then
+    REVISION="0"
+  fi
+
+  VERSION=${VERSION%%-*}
+
+  if [ "$TMPDIR" == "" ]; then
+    TMPDIR="$(bashc.tempdir)"
+  fi
+
+  p_debug "building tar package from $BUILDFOLDER"
+
+  cp -r "$BUILDFOLDER" "${TMPDIR}/${PACKAGE}-${VERSION}"
+  tar czf ${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}.tar.gz -C "$TMPDIR" ${PACKAGE}-${VERSION}
+
+  if [ $? -eq 0 ]; then
+    echo ${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}.tar.gz
+  else
+    return 1
+  fi
+  return 0
+}
+
+function acquire_vars_from_buffer() {
+  BUFFER_VARS="$1"
+  # Process the extra buffer
+  if [ "$BUFFER_VARS" != "" ]; then
+    p_debug "will process this buffer of vars:
+  $BUFFER_VARS"
+    bashc.readconf "$BUFFER_VARS" SUMMARY URL DESCRIPTION LICENSE PACKAGER DEPENDS REQUIRES PACKAGE VERSION
+    return 0
+  fi
+  return 1
+}
+
 # Some basic includes
 source lib/debug.bash
 source lib/temp.bash
 source lib/utils.bash
 source lib/config.bash
+source lib/parameters.bash
 source version
 
 # Parse the commandline into an array
-commandline_to_array ARR "$@"
+bashc.parameter_parse_commandline "$@"
 
-n=0
-while [ $n -lt ${#ARR[@]} ]; do
-    PARAM="${ARR[$n]}"
-    case "$PARAM" in
-        --verbose|-v)           VERBOSE=true;;
-        --debug)                DEBUG=true;;
-        --version | -V)         echo "$VERSION" && finalize;;
-        --help | -h)            usage && finalize;;
-        *)                      usage && finalize 1 "invalid parameter $PARAM";;
-    esac
-    n=$(($n+1))
+FILETOBUILD=
+EXECUTE=true
+# DEBUG=true
+OUTPUT_FOLDER=.
+bashc.parameters_start
+while bashc.parameters_next; do
+  PARAM="$(bashc.parameters_current)"
+  case "$PARAM" in
+    --rpm)                  GENERATE_RPM=true;;
+    --deb)                  GENERATE_DEB=true;;
+    --keep-temporary|-T)    KEEP_TEMPORARY=true;;
+    --keep-buildfolder|-k)  KEEP_BUILDFOLDER=true;;
+    --package-name| -N)     bashc.parameters_next
+                            PACKAGE="$(bashc.parameters_current)";;
+    --halt-on-errors|-H)    HALTONERRORS=true;;
+    --no-execute|-n)        EXECUTE=false;;
+    --output-folder|-o)     bashc.parameters_next
+                            OUTPUT_FOLDER="$(bashc.parameters_current)";;
+    --verbose|-v)           VERBOSE=true;;
+    --debug)                DEBUG=true;;
+    --help | -h)            usage && bashc.finalize;;
+    --version|-V)           p_out "$VERSION"
+                            bashc.finalize 0;;
+    *)                      if [ "$FILETOBUILD" == "" ]; then
+                              FILETOBUILD="$PARAM"
+                            else
+                              bashc.finalize 1 "invalid parameter $PARAM"
+                            fi;;
+  esac
 done
 
 verify_dependencies
+
+OUTPUT_FOLDER="$(readlink -e "$OUTPUT_FOLDER")"
+
+if [ "$OUTPUT_FOLDER" == "" -o ! -d "$OUTPUT_FOLDER" ]; then
+  bashc.finalize 1 "output folder is not an existing folder (it must exist)"
+fi
+
+if [ "$FILETOBUILD" == "" ]; then
+  usage && bashc.finalize 1 "missing file to build"
+fi
+
+if [ ! -e "$FILETOBUILD" ]; then
+  bashc.finalize 1 "cannot find file to build $FILETOBUILD"
+fi
+
+BUILDINFO="$(cat $FILETOBUILD)"
+
+# These are the variables that we want to be able to substitute in the commands or in the files
+export VERSION=
+export PACKAGE
+export BUILDFOLDER="$(bashc.tempdir)"
+export SOURCEFOLDER="$PWD"
+export TMPDIR="$(bashc.tempdir)"
+export FILENAME=
+
+BUFFER_VARS=
+# We are reading the lines in the bashcbuild file
+while read L || [ "$BUFFER_VARS" != "" ]; do
+  p_debug "build line: $L"
+  IFS=';' read DESTINATION SOURCES COMMANDS <<< "$L"
+  # NOTE: It should be [ $L != "" ] && { [ $SOURCES == "" ] || [[ ... ]]; }; but I'm not sure of that syntax.
+  #       anyway this expression is valid because because $L =~ <nonempty> implies that $L != "" 
+  if [ "$L" != "" -a  "$SOURCES" == "" ] || [[ "$L" =~ ^[a-zA-Z][a-zA-Z0-9_]*= ]]; then
+    p_info "not copying line $L"
+    BUFFER_VARS="${BUFFER_VARS}${L}
+"
+    continue
+  else
+    acquire_vars_from_buffer "$BUFFER_VARS"
+    BUFFER_VARS=
+    if [ "$L" == "" ]; then
+      continue
+    fi
+  fi
+
+  # If we stated a destination, we'll create the folder (even if there are not any file that triggers copying or running commands)
+  if [ "$DESTINATION" != "" ]; then
+    DESTINATION="$(echo "$BUILDFOLDER/$DESTINATION" | envsubst)"
+    DESTINATION="$(readlink -m "$DESTINATION")"
+    if [ -f "$DESTINATION" ]; then
+      p_error "$DESTINATION must be a folder"
+    fi
+    mkdir -p "$DESTINATION"
+    p_debug "destination is $DESTINATION"
+  fi
+
+  SOURCEFILES=
+  while read -d ':' SOURCE; do
+    if [ "$SOURCE" == "" ]; then
+      continue
+    fi
+
+    # First substitute the variables (the exported new ones along with the existing in the system (e.g. $HOME))
+    SOURCE="$(echo "$SOURCE" | envsubst)"
+
+    # If it is a wildcard expression, we'll try to guess all the files that are found using these wildcards
+    if [[ "$SOURCE" =~ [\*?] ]]; then
+      ls $SOURCE > /dev/null 2> /dev/null
+      RESULT=$?
+      if [ $RESULT -ne 0 ]; then
+        p_warning "could not find file(s) $SOURCE"
+        if [ "$HALTONERRORS" == "true" ]; then
+          finalize 1 "halted on file not found"
+        fi
+      else
+        for F in $SOURCE; do
+          SOURCEFILES="$F
+$SOURCEFILES"
+        done
+        p_debug "files for $SOURCE: 
+$SOURCEFILES"
+      fi
+    else
+      SOURCEFILES="$SOURCE"
+    fi
+
+    # Now we'll process each file
+    while read FILE; do
+      if [ "$FILE" == "" ]; then
+        continue
+      fi
+
+      # We'll export the filename to be able to be used in the substitutions
+      export FILENAME="$FILE"
+
+      # If we have commands to run, we'll run them for that file
+      if [ "$COMMANDS" != "" ]; then
+
+        # Substitute the variables for the commands
+        COMMANDS_E="$(echo "$COMMANDS" | envsubst)"
+
+        # We'll also process multiple commandlines (separated by ;)
+        while read -d ';' _CURRENT_COMMAND; do
+          COMMANDLINE=( )
+          bashc.arrayze_cmd COMMANDLINE "$_CURRENT_COMMAND"
+
+          if [ "$EXECUTE" == "true" ]; then
+            p_debug "running ${COMMANDLINE[@]}"
+            RESULT="$("${COMMANDLINE[@]}" 2>&1)"
+            if [ $? -ne 0 ]; then
+              p_error "$RESULT"
+              [ "$HALTONERRORS" == "true" ] && finalize 1
+            else
+              if [ "$RESULT" != "" ]; then
+                p_debug "output:
+$RESULT"
+              fi
+            fi
+          else
+            p_info "not running ${COMMANDLINE[@]} because of options"
+          fi
+        done <<< "$COMMANDS_E;"
+      fi
+
+      # If the destination is empty, we'll try to copy the file (or folder) that triggered the action
+      if [ "$DESTINATION" != "" ]; then
+        MATCHEDFILEEXISTS=false
+        if [ -d "$FILE" ]; then
+          p_debug "$FILE is a folder"
+          MATCHEDFILEEXISTS=true
+          cp -r "$FILE" "$DESTINATION"
+          if [ $? -ne 0 ]; then
+            if [ "$HALTONERRORS" == "true" ]; then
+              bashc.finalize 1 "failed to copy $FILE to $DESTINATION"
+            else
+              p_warning "failed to copy $FILE to $DESTINATION"
+            fi
+          fi
+        fi
+        if [ -f "$FILE" ]; then
+          p_debug "$FILE is a file"
+          MATCHEDFILEEXISTS=true
+          cp "$FILE" "$DESTINATION"
+          if [ $? -ne 0 ]; then
+            if [ "$HALTONERRORS" == "true" ]; then
+              bashc.finalize 1 "failed to copy $FILE to $DESTINATION"
+            else
+              p_warning "failed to copy $FILE to $DESTINATION"
+            fi
+          fi
+        fi
+
+        # If it is not a file nor a folder, we cannot do anything
+        if [ "$MATCHEDFILEEXISTS" == "false" ]; then
+          if [ "$HALTONERRORS" == "true" ]; then
+            bashc.finalize 1 "failed to find file $FILE"
+          else
+            p_warning "failed to find file $FILE"
+          fi
+        fi
+      else
+        p_debug "not coying anything because destination folder is empty (it is an exec action)"
+      fi
+    done <<< "$SOURCEFILES"
+  done <<< "${SOURCES}:"
+done < <(bashc.cleanfile "$FILETOBUILD")
+
+if [ "$PACKAGE" == "" ] || [[ ! "$PACKAGE" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
+  read -p "Package name not provided (or it is invalid). Please provide one name for the package (blank or Ctrl-C finalizes): " PACKAGE
+  if [ "$PACKAGE" == "" ] || [[ ! "$PACKAGE" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
+    bashc.finalize 1 "missing the package name (i.e. option -N or variable PACKAGE)"
+  fi
+fi
+
+if [ "$VERSION" == "" ]; then
+  p_warning "information about version not included (i.e. VERSION variable in package descriptor). Using 0.0 as the version number."
+  VERSION=0.0
+fi
+
+TARFILE="$(build_tar "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+if [ "$TARFILE" == "" ]; then
+  bashc.finalize 1 "failed to generate the tar file"
+fi
+cp "$TARFILE" "$OUTPUT_FOLDER/"
+p_out "$OUTPUT_FOLDER/$(basename "$TARFILE") successfully created"
+
+if [ "$GENERATE_RPM" == "true" ]; then
+  RPMFILE="$(build_rpm "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+  if [ "$RPMFILE" == "" ]; then
+    p_error "failed to generate the rpm file"
+    if [ "$HALTONERRORS" == "true" ]; then
+      bashc.finalize 1
+    fi
+  fi
+  cp "$RPMFILE" "$OUTPUT_FOLDER/"
+  p_out "$OUTPUT_FOLDER/$(basename "$RPMFILE") successfully created"
+fi
+
+if [ "$GENERATE_DEB" == "true" ]; then
+  DEBFILE="$(build_deb "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+  if [ "$DEBFILE" == "" ]; then
+    p_error "failed to generate the deb file"
+    if [ "$HALTONERRORS" == "true" ]; then
+      bashc.finalize 1
+    fi
+  fi
+  cp "$DEBFILE" "$OUTPUT_FOLDER/"
+  p_out "$OUTPUT_FOLDER/$(basename "$DEBFILE") successfully created"
+fi
+
+if [ "$KEEP_BUILDFOLDER" != "true" ]; then
+  p_debug "removing build folder $BUILDFOLDER"
+  rm -rf "$BUILDFOLDER" > /dev/null 2> /dev/null
+fi
+
+if [ "$KEEP_TEMPORARY" != "true" ]; then
+  p_debug "removing temporary folder $TMPDIR"
+  rm -rf "$TMPDIR" > /dev/null 2> /dev/null
+fi

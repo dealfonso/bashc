@@ -62,7 +62,7 @@ function bashc.parameters_to_list() {
 
 function bashc.list_append() {
   # Usage:
-  #  bashc.parameters_to_list ARRNAME p1 p2 p3 p4
+  #  bashc.list_append ARRNAME p1 p2 p3 p4
   # Effect:
   #  ARRNAME
   local AN="$1"
@@ -132,3 +132,7 @@ function bashc.sanitize() {
   echo "$1" | sed -e 's/\([[\/.*]\|\]\)/\\&/g'
 }
 
+function bashc.cleanfile() {
+  # This function removes the comments, the starting and trailing whitespaces of lines and removes blank lines o a file
+  cat "$1" | sed 's/#.*//g' | sed 's/^[ \t]*//g' | sed 's/[ \t]*$//g' | sed '/^$/d'
+}
