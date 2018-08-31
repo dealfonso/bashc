@@ -371,5 +371,10 @@ if [ "$EXECUTE" == "true" ]; then
   bash -- "$OUTFILE" "${PARAMS[@]}"
 fi
 
+if [ -e "$_TMPFILE1" ]; then
+  p_debug "removing temporary file"
+  rm -f "$_TMPFILE1" > /dev/null 2> /dev/null
+fi
+
 p_debug "returning to the previous folder"
 cd - > /dev/null
