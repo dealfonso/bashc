@@ -251,21 +251,7 @@ fi
 
 cd "$WORKINGFOLDER" || bashc.finalize 1 "not valid working folder $WORKINGFOLDER"
 
-# Read the config files
-for F in $CONFIGFILES; do
-  p_debug "processing file configuration file $F"
-  bashc.readconffile "$F" BASHC_LIB_PATH
-  RESULT=$?
-  if [ $RESULT -eq 255 ]; then
-    p_debug "configuration file $F does not exist"
-  else
-    if [ $RESULT -gt 10 ]; then
-      bashc.finalize 1 "too errors in the configuration file ($RESULT)"
-    else
-      p_info "configuration read from file $F"
-    fi
-  fi
-done
+bashc.readconffiles "$CONFIGFILES" BASHC_LIB_PATH
 
 # Append the paths in the parameters
 if [ "$BASHC_LIB_PATH_ADD" != "" ]; then
