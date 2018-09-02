@@ -21,7 +21,7 @@ function usage() {
 
 This is a template for a bash application
 
-$0 <appname>
+<<APPNAME>> <appname>
 
   --version | -V            Shows the version number and finalizes.
   --verbose | -v            Shows more information about the procedure.
@@ -36,11 +36,15 @@ function verify_dependencies() {
   fi
 }
 
+# The list of default configuration files (it is set here just in case that you want to change it in the commandline)
 CONFIGFILES="/etc/default/<<APPNAME>>.conf /etc/<<APPNAME>>/<<APPNAME>>.conf /etc/<<APPNAME>>.conf $HOME/.<<APPNAME>> etc/<<APPNAME>>.conf"
 
-# Some basic includes
+# Some basic includes from bashc
 source debug.bash
 source parameters.bash
+source config.bash
+
+# A include for the version of this application
 source version
 
 # Parse the commandline into an array
@@ -59,6 +63,11 @@ while bashc.parameters_next; do
   esac
 done
 
+# You should check this function to include the checks for the dependencies of your bash application
 verify_dependencies
 
+# Read the variables from the configuration files
+bashc.readconffiles "$CONFIGFILES" VAR_<<APPNAME>>
+
+# Now you have to implement your app
 p_out "wellcome to <<APPNAME>>"
