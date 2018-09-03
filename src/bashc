@@ -15,14 +15,10 @@ This is a tool that tries to flatten bash applications. It is useful if you use 
 $0 <options> <script> -- <parameters>
   <script>                  Script to build.
   <parameters>              Parameters to pass to the resulting script (if has to be executed)
-  --execute|-e              Execute the resulting file (it admits parameters at the end). This is the
-                            default option.
   --compile|-c              Compiles the script and outputs to the file (or the stdout if not provided
                             any output file).                           
   --output|-o <file>        File in which the resulting compilation (i.e. output of -c) will be left. If
                             not stated any file, will output to the stdout (i.e. -)
-  --chdir|-C <folder>       Changes the working directory to the one provided as a parameter
-                            (i.e. cd <folder> ... cd -)
   --include|-I <path>       Use the following path-like expressions to find the files that are sourced
                             in the code. That path will be included at the end of the BASHC_LIB_PATH path.
   --chdir-to-file|-C        Changes the working directory to the one in which the file is
@@ -301,7 +297,7 @@ while [ "$HAVEWORK" == "true" ]; do
       if [ "$SOLVEINCLUDE" == "true" ]; then
         p_debug "including file $_SRC_FILE"
         _CONTROLFIELD="$(cat /proc/sys/kernel/random/uuid)"
-        sed -e "0,/^$(bashc.sanitize "$_NXT_SRC")\$/s//$_CONTROLFIELD/"  -e "/$_CONTROLFIELD/ {
+        sed -e "0,/^[ \t]*$(bashc.sanitize "$_NXT_SRC")[ \t]*\$/s//$_CONTROLFIELD/"  -e "/$_CONTROLFIELD/ {
         r $_SRC_FILE
         a
         d

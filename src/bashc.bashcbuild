@@ -4,7 +4,7 @@
 #   variable PACKAGE and not including the other variables. VERSION is also recommended.
 # The next lines are the example for the **bashc** package:
 PACKAGE=bashc
-VERSION=0.1-1
+VERSION=0.9-rc1
 SUMMARY="BASHc is similar to a compiler for bash applications"
 LICENSE="Apache 2.0"
 URL="https://github.com/dealfonso/bashc"
@@ -29,12 +29,13 @@ REQUIRES="bash tar coreutils gawk"
 # This line copies the folder "lib" and the files "version" and "LICENSE" to the /usr/share/$PACKAGE folder. 
 #   We used $PACKAGE variable to demonstrate the variable substitution ability for this file.
 #   In our application, /usr/share/bashc/ will be the main folder.
-/usr/share/$PACKAGE/;lib:version:LICENSE
+/usr/share/$PACKAGE/;lib:version:LICENSE:templates
 
 # We have the following built-in variables: 
 # - SOURCEFOLDER: the folder in which we are building (the source folder for the package)
 # - TMPDIR: a temporary folder created for the package building
 # - FILENAME: the name of the file which triggers the execution
+# - FILEPATH: the path of the file which triggers the execution
 # - BUILDFOLDER: the folder in which we are building the package (the destination folders will be inside that folder) 
 # We will also be able to use the other variables that we are defining in this file.
 
@@ -46,7 +47,7 @@ REQUIRES="bash tar coreutils gawk"
 # In our case, we have 3 files (bashc, bashcbuild and bashcgen) and we want to run bashc over them, generate the REAL 
 #   executable files and leave them in a temporary folder $TMPDIR. We also need that the resulting files are marked as 
 #   executables (chmod +x)
-;bashc:bashcbuild:bashcgen;./bashc -o $TMPDIR/$FILENAME -cCS $SOURCEFOLDER/$FILENAME;chmod +x $TMPDIR/$FILENAME
+;bashc:bashcbuild:bashcgen;./bashc -o $TMPDIR/$FILENAME -cCS $SOURCEFOLDER/$FILEPATH;chmod +x $TMPDIR/$FILENAME
 
 # Finally, this line copies the REAL binaries that we generated in the previous step to the /usr/bin folder (in the package).
 /usr/bin/;$TMPDIR/bashc:$TMPDIR/bashcbuild:$TMPDIR/bashcgen
