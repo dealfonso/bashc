@@ -377,6 +377,7 @@ export BUILDFOLDER="$(bashc.tempdir)"
 export SOURCEFOLDER="$PWD"
 export TMPDIR="$(bashc.tempdir)"
 export FILENAME=
+export FILEPATH=
 
 BUFFER_VARS=
 # We are reading the lines in the bashcbuild file
@@ -446,7 +447,8 @@ $SOURCEFILES"
       fi
 
       # We'll export the filename to be able to be used in the substitutions
-      export FILENAME="$FILE"
+      export FILENAME="$(basename "$FILE")"
+      export FILEPATH="$FILE"
 
       # If we have commands to run, we'll run them for that file
       if [ "$COMMANDS" != "" ]; then
