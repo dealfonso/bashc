@@ -28,6 +28,28 @@ function bashc.Xreadconf() {
   return 0
 }
 
+function bashc.readconffiles() {
+  CONFIGFILES="$1"
+  shift
+
+  # Read the config files
+  for F in $CONFIGFILES; do
+    p_debug "processing file configuration file $F"
+    bashc.readconffile "$F" "$@"
+
+    RESULT=$?
+    if [ $RESULT -eq 255 ]; then
+      p_debug "configuration file $F does not exist"
+    else
+      if [ $RESULT -gt 10 ]; then
+        bashc.finalize 1 "too errors in the configuration file ($RESULT)"
+      else
+        p_info "configuration read from file $F"
+      fi
+    fi
+  done
+}
+
 function bashc.readconffile() {
   local _CONF_FILE="$1"
 
@@ -39,7 +61,12 @@ function bashc.readconffile() {
   # First we read the config file
   _TXT_CONF="$(cat "$_CONF_FILE" | sed 's/^[ \t]*//g' | sed 's/[ \t]*$//g' | sed '/^$/d')"
 
-  bashc.readconf "$_TXT_CONF" "$@"
+  shift
+  if [ $# -gt 0 ]; then
+    bashc.readconf "$_TXT_CONF" "$@"
+  else
+    bashc.readconf "$_TXT_CONF"
+  fi
   return $?
 }
 

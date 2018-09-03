@@ -29,8 +29,6 @@ $0 <appname>
   --folder | -f <folder>    Sets the folder in which the template is being created
                             (default: ./appname)
   --template | -t <name>    Makes use of the template named <name> (default: bash)
-  --license | -l <license>  Includes the license and license notices named <license> 
-                            (default: apache2)
   --version | -V            Shows the version number and finalizes.
   --verbose | -v            Shows more information about the procedure.
   --debug                   Shows a lot more information about the procedure.
@@ -49,45 +47,60 @@ source lib/debug.bash
 source lib/temp.bash
 source lib/utils.bash
 source lib/config.bash
+source lib/parameters.bash
 source version
 
 # Parse the commandline into an array
-bashc.commandline_to_array ARR "$@"
-
-function bashc.hello() {
-  echo "hello world"
-}
-
-function nextparam() {
-  n=$((n+1))
-  PARAM="${ARR[$n]}"
-}
+bashc.parameter_parse_commandline "$@"
 
 FOLDER=
 APPNAME=
-
-n=0
-while [ $n -lt ${#ARR[@]} ]; do
-    PARAM="${ARR[$n]}"
-    case "$PARAM" in
-        --folder|-f)            nextparam
-                                FOLDER="$PARAM";;
-        --template|-t)          bashc.finalize 1 "template usage not implemented";;
-        --license|-l)           bashc.finalize 1 "license usage not implemented";;
-        --verbose|-v)           VERBOSE=true;;
-        --debug)                DEBUG=true;;
-        --version | -V)         echo "$VERSION" && bashc.finalize;;
-        --help | -h)            usage && bashc.finalize;;
-        *)                      if [ "$APPNAME" == "" ]; then
-                                  APPNAME="$PARAM"
-                                else
-                                  usage && bashc.finalize 1 "invalid parameter $PARAM"
-                                fi;;
-    esac
-    n=$(($n+1))
+TEMPLATE=bash
+bashc.parameters_start
+while bashc.parameters_next; do
+  PARAM="$(bashc.parameters_current)"
+  case "$PARAM" in
+    --force|-F)             FORCEOVERWRITE=true;;
+    --list-templates|-l)    LISTTEMPLATES=true;;
+    --template|-t)          bashc.parameters_next
+                            TEMPLATE="$(bashc.parameters_current)";;
+    --folder|-f)            bashc.parameters_next
+                            FOLDER="$(bashc.parameters_current)";;
+    --verbose|-v)           VERBOSE=true;;
+    --debug)                DEBUG=true;;
+    --help | -h)            usage && bashc.finalize;;
+    --version|-V)           p_out "$VERSION"
+                            bashc.finalize 0;;
+    *)                      if [ "$APPNAME" == "" ]; then
+                              APPNAME="$PARAM"
+                            else
+                              usage && bashc.finalize 1 "invalid parameter $PARAM"
+                            fi;;
+  esac
 done
 
 verify_dependencies
+
+CONFIGFILES="/etc/default/bashcgen.conf /etc/bashc/bashcgen.conf /etc/bashcgen.conf $HOME/.bashcgen etc/bashcgen.conf"
+
+bashc.readconffiles "$CONFIGFILES" BASHCGEN_TEMPLATE_PATH
+
+if [ ! -d "$BASHCGEN_TEMPLATE_PATH" ]; then
+  bashc.finalize 1 "the template folder is not valid"
+fi
+
+TEMPLATES_S="$(find "${BASHCGEN_TEMPLATE_PATH}" -maxdepth 1 -mindepth 1 -type d -printf "%P\n")"
+
+if [ "$LISTTEMPLATES" == "true" ]; then
+  p_out "Templates available:"
+  for T in $TEMPLATES_S; do
+    p_out "$T"
+  done
+  bashc.finalize 0
+fi
+
+TEMPLATES=()
+bashc.lines_to_array TEMPLATES "$TEMPLATES_S"
 
 if [ "$APPNAME" == "" ]; then
   bashc.finalize 1 "no appname set"
@@ -101,8 +114,27 @@ if [ "$FOLDER" == "" ]; then
   FOLDER="./$APPNAME"
 fi
 
-if [ -d "$FOLDER" ]; then
+if [ -d "$FOLDER" -a "$FORCEOVERWRITE" != "true" ]; then
   bashc.finalize 1 "folder $FOLDER already exists"
 fi
 
+if ! bashc.in_list TEMPLATES "$TEMPLATE"; then
+  bashc.finalize 1 "template $TEMPLATE does not exist"
+fi
+
 p_debug "creating app $APPNAME in folder $FOLDER"
+FILES="$(find "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE" -mindepth 1 -printf "%P\n")"
+
+mkdir -p "$FOLDER"
+for F in $FILES; do
+  INAPPNAME="${F//APPNAME/$APPNAME}"
+  p_debug "creating file $INAPPNAME"
+  if [ -d "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE/$F" ]; then
+    mkdir -p $FOLDER/$INAPPNAME
+  else
+    cp "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE/$F" "$FOLDER/$INAPPNAME"
+    sed -i "s/<<APPNAME>>/$APPNAME/g" "$FOLDER/$INAPPNAME"
+  fi
+done
+
+p_out "application $APPNAME created in folder $FOLDER"

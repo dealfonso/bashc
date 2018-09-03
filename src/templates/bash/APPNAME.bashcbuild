@@ -1,0 +1,15 @@
+PACKAGE=<<APPNAME>>
+VERSION=0.0-0
+SUMMARY="<<APPNAME>> - generated using bashcgen"
+LICENSE="Apache 2.0"
+DESCRIPTION="<<APPNAME>> - generated using bashcgen"
+PACKAGER=""
+# DEPENDS is for DEB packages
+DEPENDS="bash, coreutils, gettext-base, gawk"
+# REQUIRES is for RPM packages
+REQUIRES="bash tar coreutils gawk"
+
+/usr/share/$PACKAGE/;lib:version:LICENSE
+/etc/$PACKAGE/;etc/*
+;<<APPNAME>>;bashc -o $TMPDIR/$FILENAME -cCS $SOURCEFOLDER/$FILENAME;chmod +x $TMPDIR/$FILENAME
+/usr/bin/;$TMPDIR/<<APPNAME>>

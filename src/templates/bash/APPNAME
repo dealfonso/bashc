@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# <<APPNAME>>
+# Copyright (C) - 
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+function usage() {
+  cat <<EOF
+
+This is a template for a bash application
+
+<<APPNAME>> <appname>
+
+  --version | -V            Shows the version number and finalizes.
+  --verbose | -v            Shows more information about the procedure.
+  --debug                   Shows a lot more information about the procedure.
+  --help | -h               Shows this help and exits.
+EOF
+}
+
+function verify_dependencies() {
+  if false; then
+    bashc.finalize 1 "dependency failed"
+  fi
+}
+
+# The list of default configuration files (it is set here just in case that you want to change it in the commandline)
+CONFIGFILES="/etc/default/<<APPNAME>>.conf /etc/<<APPNAME>>/<<APPNAME>>.conf /etc/<<APPNAME>>.conf $HOME/.<<APPNAME>> etc/<<APPNAME>>.conf"
+
+# Some basic includes from bashc
+source debug.bash
+source parameters.bash
+source config.bash
+
+# A include for the version of this application
+source version
+
+# Parse the commandline into an array
+bashc.parameter_parse_commandline "$@"
+
+bashc.parameters_start
+while bashc.parameters_next; do
+  PARAM="$(bashc.parameters_current)"
+  case "$PARAM" in
+    --verbose|-v)           VERBOSE=true;;
+    --debug)                DEBUG=true;;
+    --help | -h)            usage && bashc.finalize;;
+    --version|-V)           p_out "$VERSION"
+                            bashc.finalize 0;;
+    *)                      usage && bashc.finalize 1 "invalid parameter $PARAM";;
+  esac
+done
+
+# You should check this function to include the checks for the dependencies of your bash application
+verify_dependencies
+
+# Read the variables from the configuration files
+bashc.readconffiles "$CONFIGFILES" VAR_<<APPNAME>>
+
+# Now you have to implement your app
+p_out "wellcome to <<APPNAME>>"
