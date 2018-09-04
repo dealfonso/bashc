@@ -221,8 +221,15 @@ while bashc.parameters_next; do
                               if [ "$FILETOJOIN" == "" ]; then
                                 FILETOJOIN="$PARAM"
                               else
-                                PARAMS+=("$PARAM")       
+                                if [ "$EXECUTE" != "false" ]; then
+                                  PARAMS+=("$PARAM")
+                                else
+                                  usage && bashc.finalize 1 "invalid parameter $PARAM"
+                                fi
                               fi                      
+                              if [ "$EXECUTE" == "false" ]; then
+                                break
+                              fi
                               bashc.parameters_next     
                             done;;
   esac
