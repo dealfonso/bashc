@@ -18,9 +18,9 @@ DESCRIPTION="This is a tool that tries to flatten bash applications. It is usefu
   the resulting application. More info at $URL"
 PACKAGER="Carlos de Alfonso <caralla@upv.es>"
 # DEPENDS is for DEB packages
-DEPENDS="bash, tar, coreutils, gettext-base, gawk"
+DEPENDS="bash, tar, coreutils, gettext-base, gawk, fakeroot, dpkg, rpm, sed"
 # REQUIRES is for RPM packages
-REQUIRES="bash tar coreutils gawk"
+REQUIRES="bash tar coreutils gawk gettext rpm-build"
 
 # You can also include "build lines" with the format
 #   <destination folder>;<files:using:path:format>;<commands to execute for those files prior to copy them to the destination folder>

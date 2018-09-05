@@ -5,9 +5,9 @@ LICENSE="Apache 2.0"
 DESCRIPTION="<<APPNAME>> - generated using bashcgen"
 PACKAGER=""
 # DEPENDS is for DEB packages
-DEPENDS="bash, coreutils, gettext-base, gawk"
+DEPENDS="bash, tar, coreutils, gettext-base, gawk, sed"
 # REQUIRES is for RPM packages
-REQUIRES="bash tar coreutils gawk"
+REQUIRES="bash tar coreutils gawk gettext"
 
 /usr/share/$PACKAGE/;lib:version:LICENSE
 /etc/$PACKAGE/;etc/*

@@ -82,9 +82,12 @@ EOF
 }
 
 function verify_dependencies() {
-  if false; then
-    finalize 1 "dependency failed"
-  fi
+  rpmbuild --version > /dev/null 2> /dev/null || p_warning "cannot build rpm packages (rpmbuild not found)"
+  dpkg-deb --version > /dev/null 2> /dev/null || p_warning "cannot build deb packages (dpkg-deb not found)"
+  fakeroot --version > /dev/null 2> /dev/null || p_warning "cannot build deb packages (fakeroot not found)"
+  tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
+  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
+  gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
 }
 
 function build_deb() {
@@ -311,11 +314,11 @@ function acquire_vars_from_buffer() {
 }
 
 # Some basic includes
-source lib/debug.bash
-source lib/temp.bash
-source lib/utils.bash
-source lib/config.bash
-source lib/parameters.bash
+source debug.bashc
+source temp.bashc
+source utils.bashc
+source config.bashc
+source parameters.bashc
 source version
 
 # Parse the commandline into an array

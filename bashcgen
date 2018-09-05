@@ -37,17 +37,15 @@ EOF
 }
 
 function verify_dependencies() {
-  if false; then
-    bashc.finalize 1 "dependency failed"
-  fi
+  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
 }
 
 # Some basic includes
-source lib/debug.bash
-source lib/temp.bash
-source lib/utils.bash
-source lib/config.bash
-source lib/parameters.bash
+source debug.bashc
+source temp.bashc
+source utils.bashc
+source config.bashc
+source parameters.bashc
 source version
 
 # Parse the commandline into an array

@@ -37,16 +37,13 @@ $0 <options> <script> -- <parameters>
 EOF
 }
 
-# Some basic includes
-source lib/debug.bash
-source lib/temp.bash
-source lib/utils.bash
-source lib/config.bash
-source lib/parameters.bash
-source version
+function verify_dependencies() {
+  tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
+  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
+  gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
+}
 
-# Parse the commandline into an array
-bashc.parameter_parse_commandline "$@"
+verify_dependencies
 
 function getfunctions_fnc() {
   echo "$1" | awk '
@@ -190,6 +187,18 @@ EXECUTE=true
 ONLYONCE=false
 SKIPMISSING=false
 STRIPFUNCTIONS=false
+
+# Some basic includes
+# These includes 
+source lib/debug.bashc
+source lib/temp.bashc
+source lib/utils.bashc
+source lib/config.bashc
+source lib/parameters.bashc
+source version
+
+# Parse the commandline into an array
+bashc.parameter_parse_commandline "$@"
 
 # Prepare the default lib path (i.e. find files in the current folder)
 BASHC_LIB_PATH=${BASHC_LIB_PATH:-"."}
