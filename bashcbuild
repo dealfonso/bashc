@@ -82,9 +82,12 @@ EOF
 }
 
 function verify_dependencies() {
-  if false; then
-    finalize 1 "dependency failed"
-  fi
+  rpmbuild --version > /dev/null 2> /dev/null || p_warning "cannot build rpm packages (rpmbuild not found)"
+  dpkg-deb --version > /dev/null 2> /dev/null || p_warning "cannot build deb packages (dpkg-deb not found)"
+  fakeroot --version > /dev/null 2> /dev/null || p_warning "cannot build deb packages (fakeroot not found)"
+  tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
+  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
+  gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
 }
 
 function build_deb() {

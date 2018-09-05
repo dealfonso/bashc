@@ -37,6 +37,14 @@ $0 <options> <script> -- <parameters>
 EOF
 }
 
+function verify_dependencies() {
+  tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
+  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
+  gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
+}
+
+verify_dependencies
+
 # Some basic includes
 source lib/debug.bash
 source lib/temp.bash

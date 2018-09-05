@@ -37,9 +37,7 @@ EOF
 }
 
 function verify_dependencies() {
-  if false; then
-    bashc.finalize 1 "dependency failed"
-  fi
+  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
 }
 
 # Some basic includes
