@@ -40,9 +40,9 @@ function verify_dependencies() {
 CONFIGFILES="/etc/default/<<APPNAME>>.conf /etc/<<APPNAME>>/<<APPNAME>>.conf /etc/<<APPNAME>>.conf $HOME/.<<APPNAME>> etc/<<APPNAME>>.conf"
 
 # Some basic includes from bashc
-source debug.bash
-source parameters.bash
-source config.bash
+source debug.bashc
+source parameters.bashc
+source config.bashc
 
 # A include for the version of this application
 source version

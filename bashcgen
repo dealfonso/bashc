@@ -41,11 +41,11 @@ function verify_dependencies() {
 }
 
 # Some basic includes
-source lib/debug.bash
-source lib/temp.bash
-source lib/utils.bash
-source lib/config.bash
-source lib/parameters.bash
+source debug.bashc
+source temp.bashc
+source utils.bashc
+source config.bashc
+source parameters.bashc
 source version
 
 # Parse the commandline into an array

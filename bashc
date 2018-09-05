@@ -45,17 +45,6 @@ function verify_dependencies() {
 
 verify_dependencies
 
-# Some basic includes
-source lib/debug.bash
-source lib/temp.bash
-source lib/utils.bash
-source lib/config.bash
-source lib/parameters.bash
-source version
-
-# Parse the commandline into an array
-bashc.parameter_parse_commandline "$@"
-
 function getfunctions_fnc() {
   echo "$1" | awk '
     /^[ \t]*function (.*)/{
@@ -198,6 +187,18 @@ EXECUTE=true
 ONLYONCE=false
 SKIPMISSING=false
 STRIPFUNCTIONS=false
+
+# Some basic includes
+# These includes 
+source lib/debug.bashc
+source lib/temp.bashc
+source lib/utils.bashc
+source lib/config.bashc
+source lib/parameters.bashc
+source version
+
+# Parse the commandline into an array
+bashc.parameter_parse_commandline "$@"
 
 # Prepare the default lib path (i.e. find files in the current folder)
 BASHC_LIB_PATH=${BASHC_LIB_PATH:-"."}
