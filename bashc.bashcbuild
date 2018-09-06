@@ -43,11 +43,6 @@ REQUIRES="bash tar coreutils gawk gettext rpm-build"
 /etc/$PACKAGE/;etc/*
 
 # This is a complex example: we need to execute some commands to generate the files that we'll copy in the final folder
-#   * We can leave the <destination folder> in blank, so that we match files in the building folder and execute commands
 # In our case, we have 3 files (bashc, bashcbuild and bashcgen) and we want to run bashc over them, generate the REAL 
-#   executable files and leave them in a temporary folder $TMPDIR. We also need that the resulting files are marked as 
-#   executables (chmod +x)
-;bashc:bashcbuild:bashcgen;./bashc -o $TMPDIR/$FILENAME -cCS $SOURCEFOLDER/$FILEPATH;chmod +x $TMPDIR/$FILENAME
-
-# Finally, this line copies the REAL binaries that we generated in the previous step to the /usr/bin folder (in the package).
-/usr/bin/;$TMPDIR/bashc:$TMPDIR/bashcbuild:$TMPDIR/bashcgen
+#   executable files. We also need that the resulting files are marked as executables (chmod +x)
+/usr/bin/;bashc:bashcbuild:bashcgen;./bashc.bashc -o $SOURCEFOLDER/$FILEPATH -cCS $SOURCEFOLDER/${FILEPATH}.bashc;chmod +x $SOURCEFOLDER/$FILEPATH
