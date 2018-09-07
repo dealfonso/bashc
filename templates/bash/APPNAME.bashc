@@ -37,7 +37,7 @@ function verify_dependencies() {
 }
 
 # The list of default configuration files (it is set here just in case that you want to change it in the commandline)
-CONFIGFILES="/etc/default/<<APPNAME>>.conf /etc/<<APPNAME>>/<<APPNAME>>.conf /etc/<<APPNAME>>.conf $HOME/.<<APPNAME>> etc/<<APPNAME>>.conf"
+CONFIGFILES="/etc/default/<<APPNAME>>.conf /etc/<<APPNAME>>/<<APPNAME>>.conf /etc/<<APPNAME>>.conf $HOME/.<<APPNAME>> etc/<<APPNAME>>.conf etc/<<APPNAME>>/<<APPNAME>>.conf"
 
 # The basic include than gets all from bashc (you should use -S flag to remove the unused functions)
 source all.bashc
@@ -68,4 +68,4 @@ verify_dependencies
 bashc.readconffiles "$CONFIGFILES" VAR_<<APPNAME>>
 
 # Now you have to implement your app
-p_out "wellcome to <<APPNAME>>"
+p_out "wellcome to <<APPNAME>>, I got the value ${VAR_<<APPNAME>>} for var VAR_<<APPNAME>> from the config file"

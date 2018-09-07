@@ -13,7 +13,7 @@ function bashc.ltrim() {
   echo "$A"
 }
 
-function bash.rtrim() {
+function bashc.rtrim() {
   shopt -s extglob
   local A="${1%%+([[:space:]])}"
   shopt -u extglob
