@@ -38,6 +38,7 @@ EOF
 
 function verify_dependencies() {
   sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
+  envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
 }
 
 # Some basic includes

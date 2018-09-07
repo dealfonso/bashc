@@ -88,6 +88,7 @@ function verify_dependencies() {
   tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
   sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
   gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
+  envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
 }
 
 function build_deb() {
@@ -196,14 +197,17 @@ function build_rpm() {
     TMPDIR="$(bashc.tempdir)"
   fi
 
+  local RPM_TMPDIR="${TMPDIR}/rpm"
+  mkdir -p "${RPM_TMPDIR}"
+
   p_debug "building package from $BUILDFOLDER"
 
-  cp -r "$BUILDFOLDER" "${TMPDIR}/${PACKAGE}-${VERSION}"
+  cp -r "$BUILDFOLDER" "${RPM_TMPDIR}/${PACKAGE}-${VERSION}"
+  
+  tar czf ${RPM_TMPDIR}/${PACKAGE}-${VERSION}.tar.gz -C "$RPM_TMPDIR" ${PACKAGE}-${VERSION}
+  local TARFILES="$(tar tf ${RPM_TMPDIR}/${PACKAGE}-${VERSION}.tar.gz | sed "s/${PACKAGE}-${VERSION}//g" | sed '/\/$/d')"
 
-  tar czf ${TMPDIR}/${PACKAGE}-${VERSION}.tar.gz -C "$TMPDIR" ${PACKAGE}-${VERSION}
-  local TARFILES="$(tar tf ${TMPDIR}/${PACKAGE}-${VERSION}.tar.gz | sed "s/${PACKAGE}-${VERSION}//g" | sed '/\/$/d')"
-
-  cat > ${TMPDIR}/${PACKAGE}.spec <<EOF
+  cat > ${RPM_TMPDIR}/${PACKAGE}.spec <<EOF
 %define version $VERSION
 %define revision $REVISION
 Summary:        bashkeleton - skeleton of a bash application
@@ -212,16 +216,16 @@ Name:           ${PACKAGE}
 EOF
 
   if [ "$URL" != "" ]; then
-    echo "URL:            $URL" >> ${TMPDIR}/${PACKAGE}.spec
+    echo "URL:            $URL" >> ${RPM_TMPDIR}/${PACKAGE}.spec
   fi
   if [ "$PACKAGER" != "" ]; then
-    echo "Packager:       $PACKAGER" >> ${TMPDIR}/${PACKAGE}.spec
+    echo "Packager:       $PACKAGER" >> ${RPM_TMPDIR}/${PACKAGE}.spec
   fi
   if [ "$REQUIRES" != "" ]; then
-    echo "Requires:       $REQUIRES" >> ${TMPDIR}/${PACKAGE}.spec
+    echo "Requires:       $REQUIRES" >> ${RPM_TMPDIR}/${PACKAGE}.spec
   fi
 
-  cat >> ${TMPDIR}/${PACKAGE}.spec <<\EOF
+  cat >> ${RPM_TMPDIR}/${PACKAGE}.spec <<\EOF
 Version:        %{version}
 Release:        %{revision}
 Group:          System Environment
@@ -230,9 +234,9 @@ BuildArch:      noarch
 %description
 EOF
   if [ "$DESCRIPTION" != "" ]; then
-    echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}' >> ${TMPDIR}/${PACKAGE}.spec
+    echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}' >> ${RPM_TMPDIR}/${PACKAGE}.spec
   fi
-  cat >> ${TMPDIR}/${PACKAGE}.spec <<\EOF
+  cat >> ${RPM_TMPDIR}/${PACKAGE}.spec <<\EOF
 %prep
 %setup -q
 %build
@@ -244,7 +248,7 @@ rm -rf $RPM_BUILD_ROOT
 %post
 %postun
 EOF
-  cat >> ${TMPDIR}/${PACKAGE}.spec <<EOF
+  cat >> ${RPM_TMPDIR}/${PACKAGE}.spec <<EOF
 %files
 %defattr(-,root,root,755)
 $(echo "$TARFILES" | grep -v '^/etc' | grep '/bin/' | awk '{printf "\"%s\"\n", $0}')
@@ -253,19 +257,19 @@ $(echo "$TARFILES" | grep -v '^/etc' | grep -v '/bin/' | awk '{printf "\"%s\"\n"
 EOF
 
   if [ "$(ls $BUILDFOLDER/etc)" != "" ]; then
-    cat >> ${TMPDIR}/${PACKAGE}.spec <<EOF
+    cat >> ${RPM_TMPDIR}/${PACKAGE}.spec <<EOF
 %config
 $(echo "$TARFILES" | grep '^/etc' | grep -v '/bin/' | awk '{printf "\"%s\"\n", $0}')
 EOF
   fi
 
   mkdir -p ~/rpmbuild/SOURCES/
-  cp ${TMPDIR}/${PACKAGE}-${VERSION}.tar.gz ~/rpmbuild/SOURCES/
-  rpmbuild -ba ${TMPDIR}/${PACKAGE}.spec > /dev/null 2> /dev/null
-
+  cp ${RPM_TMPDIR}/${PACKAGE}-${VERSION}.tar.gz ~/rpmbuild/SOURCES/
+  local RESULT="$(rpmbuild -ba ${RPM_TMPDIR}/${PACKAGE}.spec 2>&1)"
   if [ $? -eq 0 ]; then
     echo ~/rpmbuild/RPMS/noarch/${PACKAGE}-${VERSION}-${REVISION}.noarch.rpm
   else
+    p_error "$RESULT"
     return 1
   fi
   return 0

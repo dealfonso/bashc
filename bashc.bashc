@@ -41,6 +41,7 @@ function verify_dependencies() {
   tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
   sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
   gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
+  envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
 }
 
 verify_dependencies
@@ -356,6 +357,7 @@ fi
 
 if [ "$OUTFILE" != "" ]; then
   mv "$_TMPFILE1" "$OUTFILE"
+  chmod +x "$OUTFILE"
 else
   if [ "$EXECUTE" == "true" ]; then
     OUTFILE="$_TMPFILE1"
