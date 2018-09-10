@@ -25,7 +25,11 @@ function usage() {
 This tool creates a template for an application
 
 $0 <appname>
-
+  --only-main-app | -M      Copy only the executable files in the main folder from the
+                            template (in that case, the default folder is "."). Mainly 
+                            created to generate new scripts for the current application.
+  --overwrite | -o          Overwrite files without prompting
+  --list-templates | -l     List the templates that are available for bashcgen and finalize.
   --folder | -f <folder>    Sets the folder in which the template is being created
                             (default: ./appname)
   --template | -t <name>    Makes use of the template named <name> (default: bash)
@@ -59,7 +63,8 @@ bashc.parameters_start
 while bashc.parameters_next; do
   PARAM="$(bashc.parameters_current)"
   case "$PARAM" in
-    --force|-F)             FORCEOVERWRITE=true;;
+    --only-main-app|-M)     MAINAPPONLY=true;;
+    --overwrite|-o)         OVERWRITE=true;;
     --list-templates|-l)    LISTTEMPLATES=true;;
     --template|-t)          bashc.parameters_next
                             TEMPLATE="$(bashc.parameters_current)";;
@@ -109,20 +114,37 @@ if [[ ! "$APPNAME" =~ ^[A-Za-z0-9]*$ ]]; then
   bashc.finalize 1 "the name $APPNAME is not a valid name for an application"
 fi
 
-if [ "$FOLDER" == "" ]; then
-  FOLDER="./$APPNAME"
-fi
-
-if [ -d "$FOLDER" -a "$FORCEOVERWRITE" != "true" ]; then
-  bashc.finalize 1 "folder $FOLDER already exists"
-fi
-
 if ! bashc.in_list TEMPLATES "$TEMPLATE"; then
   bashc.finalize 1 "template $TEMPLATE does not exist"
 fi
 
+FOLDEROVERWRITE="$OVERWRITE"
+
+if [ "$MAINAPPONLY" == "true" ]; then
+  if [ "$FOLDER" == "" ]; then
+    FOLDER="."
+    FOLDEROVERWRITE="true"
+  fi
+fi
+
+if [ "$FOLDER" == "" ]; then
+  FOLDER="./$APPNAME"
+fi
+
+if [ -d "$FOLDER" -a "$FOLDEROVERWRITE" != "true" ]; then
+  bashc.finalize 1 "folder $FOLDER already exists"
+fi
+
 p_debug "creating app $APPNAME in folder $FOLDER"
-FILES="$(find "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE" -mindepth 1 -printf "%P\n")"
+if [ "$MAINAPPONLY" == "true" ]; then
+  FILES="$(find "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE" -mindepth 1 -maxdepth 1 -type f -executable -printf "%P\n" 2> /dev/null)"
+else
+  FILES="$(find "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE" -mindepth 1 -printf "%P\n" 2> /dev/null)"
+fi
+
+if [ "$FILES" == "" ]; then
+  bashc.finalize 1 "error finding files in the template"
+fi
 
 mkdir -p "$FOLDER"
 for F in $FILES; do
@@ -131,8 +153,29 @@ for F in $FILES; do
   if [ -d "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE/$F" ]; then
     mkdir -p $FOLDER/$INAPPNAME
   else
-    cp "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE/$F" "$FOLDER/$INAPPNAME"
-    sed -i "s/<<APPNAME>>/$APPNAME/g" "$FOLDER/$INAPPNAME"
+    Q_OVERWRITE=
+    if [ -e "$FOLDER/$INAPPNAME" ]; then
+      p_warning "file $FOLDER/$INAPPNAME already exists"
+      if [ "$OVERWRITE" != "true" ]; then
+        read -p "Overwrite existing file $FOLDER/$INAPPNAME? (y/N/always) " Q_OVERWRITE
+        if [ "$Q_OVERWRITE" == "always" ]; then
+          OVERWRITE="true"
+          Q_OVERWRITE="y"
+        fi
+        if [ "$Q_OVERWRITE" != "y" ]; then
+          p_error "Not overwritting existing file $FOLDER/$INAPPNAME"
+        fi
+      else
+        Q_OVERWRITE="y"
+      fi
+    else
+      Q_OVERWRITE="y"
+    fi
+
+    if [ "$Q_OVERWRITE" == "y" ]; then
+      cp "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE/$F" "$FOLDER/$INAPPNAME"
+      sed -i "s/<<APPNAME>>/$APPNAME/g" "$FOLDER/$INAPPNAME"
+    fi
   fi
 done
 
