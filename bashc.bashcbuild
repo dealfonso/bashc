@@ -18,9 +18,9 @@ DESCRIPTION="This is a tool that tries to flatten bash applications. It is usefu
   the resulting application. More info at $URL"
 PACKAGER="Carlos de Alfonso <caralla@upv.es>"
 # DEPENDS is for DEB packages
-DEPENDS="bash, tar, coreutils, gettext-base, gawk, fakeroot, dpkg, rpm, sed"
+DEPENDS="bash, tar, coreutils, gettext-base, gawk, fakeroot, dpkg, rpm, sed, gzip"
 # REQUIRES is for RPM packages
-REQUIRES="bash tar coreutils gawk gettext rpm-build"
+REQUIRES="bash tar coreutils gawk gettext rpm-build gzip"
 
 # You can also include "build lines" with the format
 #   <destination folder>;<files:using:path:format>;<commands to execute for those files prior to copy them to the destination folder>
@@ -40,7 +40,7 @@ REQUIRES="bash tar coreutils gawk gettext rpm-build"
 # We will also be able to use the other variables that we are defining in this file.
 
 # This line copies the files in the ./etc/ folder to folder /etc/$PACKAGE (/etc/bashc)
-/etc/$PACKAGE/;etc/*
+/etc/$PACKAGE/;etc/bashc/*
 
 # This is a complex example: we need to execute some commands to generate the files that we'll copy in the final folder
 # In our case, we have 3 files (bashc, bashcbuild and bashcgen) and we want to run bashc over them, generate the REAL 

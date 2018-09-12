@@ -28,6 +28,7 @@ $0 <options> <script> -- <parameters>
   --include-once|-O         The app will try to detect the "source" statements only once. Take
                             into account that if one sourced file also includes a "source" statement,
                             using this mode it will not be sourced.
+  --gzip-version|-G         Create a compressed version for the script (using gzip).
   --strip-functions|-S      Try to remove the unused functions (useful to create minimal commands)
   --version | -V            Outputs the version number and finalizes.
   --verbose | -v            Shows more information about the procedure.
@@ -42,6 +43,9 @@ function verify_dependencies() {
   sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
   gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
   envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
+  gzip --version > /dev/null 2> /dev/null || bashc.finalize 1 "gzip not found"
+  gunzip --version > /dev/null 2> /dev/null || bashc.finalize 1 "gunzip not found"
+  base64 --version > /dev/null 2> /dev/null || bashc.finalize 1 "base64 not found"
 }
 
 verify_dependencies
@@ -208,6 +212,7 @@ bashc.parameters_start
 while bashc.parameters_next; do
   PARAM="$(bashc.parameters_current)"
   case "$PARAM" in
+    --gzip-version|-G)      COMPRESSEDVERSION=true;;
     --include|-I)           bashc.parameters_next
                             BASHC_LIB_PATH_ADD="$(bashc.parameters_current)";;
     --folder|-f)            bashc.parameters_next
@@ -353,6 +358,17 @@ if [ "$STRIPFUNCTIONS" == "true" ]; then
   done
 
   echo "$F_CONTENT" > "$_TMPFILE1"
+fi
+
+if [ "$COMPRESSEDVERSION" == "true" ]; then
+  _TMPFILE2=$(bashc.tempfile)
+  COMPRESSEDCONTENT="$(cat "$_TMPFILE1" | gzip | base64)"
+  cat > "$_TMPFILE2" <<EOT
+#!/bin/bash
+COMPRESSEDCONTENT="$COMPRESSEDCONTENT"
+eval "\$(echo "\$COMPRESSEDCONTENT" | base64 -d | gunzip)"
+EOT
+  mv "$_TMPFILE2" "$_TMPFILE1"
 fi
 
 if [ "$OUTFILE" != "" ]; then
