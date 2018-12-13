@@ -256,7 +256,7 @@ $(echo "$TARFILES" | grep -v '^/etc' | grep '/bin/' | awk '{printf "\"%s\"\n", $
 $(echo "$TARFILES" | grep -v '^/etc' | grep -v '/bin/' | awk '{printf "\"%s\"\n", $0}')
 EOF
 
-  if [ "$(ls $BUILDFOLDER/etc)" != "" ]; then
+  if [ "$(ls $BUILDFOLDER/etc  2> /dev/null)" != "" ]; then
     cat >> ${RPM_TMPDIR}/${PACKAGE}.spec <<EOF
 %config
 $(echo "$TARFILES" | grep '^/etc' | grep -v '/bin/' | awk '{printf "\"%s\"\n", $0}')
