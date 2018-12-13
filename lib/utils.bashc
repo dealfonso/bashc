@@ -34,14 +34,7 @@ function bashc.build_cmdline() {
 }
 
 function bashc.dump_list() {
-  # Usage:
-  # bashc.dump_list "${ARRNAME[@]}"
-  local n=0
-  while [ $# -gt 0 ]; do
-    p_debug "$n: $1"
-    shift
-    n=$((n+1))
-  done
+  bashc.dump_in_lines "$@"
 }
 
 function bashc.parameters_to_list() {
@@ -155,4 +148,55 @@ function bashc.sanitize() {
 function bashc.cleanfile() {
   # This function removes the comments, the starting and trailing whitespaces of lines and removes blank lines o a file
   cat "$1" | sed 's/#.*//g' | sed 's/^[ \t]*//g' | sed 's/[ \t]*$//g' | sed '/^$/d'
+}
+
+function bashc.dump_in_lines() {
+  # Function that dumps (in the debug messages) a set of parameters, putting each of them in one numbered line.
+  #  It is of special interest to dump arrays
+  #  * this is a generalized version of bashc.dump_list
+  # Usage:
+  #  bashc.dump_in_lines "${ARR[@]}"
+  local n=0
+  while [ $# -gt 0 ]; do
+    p_debug "[$n]: $1"
+    shift
+    n=$((n+1))
+  done
+}
+
+function bashc.dump_vars() {
+  # Function that dumps (in the debug messages) the value of a list of variables
+  # Usage:
+  #  bashc.dump_vars V1 V2 V3 ...
+  while [ $# -gt 0 ]; do
+    p_debug "$1=${!1}"
+    shift
+  done
+}
+
+function bashc.expand_ranges() {
+  # Function that expands basic ranges in lines. It accepts multiple ranges that may be letters (e.g. [a-z]) or numbers (e.g. [3-5]); even
+  #   the reverse order is accepted (e.g. 3-1).
+  # 
+  # Usage:
+  #   bashc.expand_ranges host0[0-4] 
+  #     * echoes "host00 host01 host02 host03 host04" (in lines)
+  #   bashc.expand_ranges host[0-2][c-a] 
+  #     * echoes "host0c host0b host0a host1c host1b host1a host2c host2b host2a" (in lines)
+  local NAME="$1"
+  local v PATTERN CONTENT L_LIMIT U_LIMIT
+  local RANGE="$(echo "$NAME" | grep -o '\[\([0-9]\{1,\}-[0-9]\{1,\}\|[a-z]-[a-z]\|[A-Z]-[A-Z]\)\]' | head -1)"
+  if [ "$RANGE" != "" ]; then
+    RANGE="${RANGE:1:-1}"
+    PATTERN="\[${RANGE}\]"
+    p_debug "range detected: $RANGE"
+    IFS='-' read L_LIMIT U_LIMIT <<< "$RANGE"
+    for v in $(eval "echo {$L_LIMIT..$U_LIMIT}"); do
+      CONTENT="${NAME/$PATTERN/$v}"
+      bashc.expand_ranges "$CONTENT"
+    done
+    return 0
+  fi
+  echo $NAME
+  return 1
 }
