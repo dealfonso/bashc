@@ -81,35 +81,64 @@ function bashc.readconf() {
   bashc.list_append _VALID_KEYS "$@"
 
   local _EXITCODE=0
+  local MULTILINE_KEY=
+  local MULTILINE_BUFFER=
   # Let's read the lines
   while read L; do
-    if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
-      IFS='=' read _CURRENT_KEY _CURRENT_VALUE <<< "$L"
-      _CURRENT_VALUE="$(bashc.cleanvalue "$_CURRENT_VALUE")"
-      if [ $? -ne 0 ]; then
-        p_warning "ignoring invalid value for key $_CURRENT_KEY"
-        _EXITCODE=$((_EXITCODE+1))
+    if [ "$MULTILINE_KEY" != "" ]; then
+      MULTILINE_BUFFER="${MULTILINE_BUFFER}\n${L}"
+      if [[ "$L" =~ [^\"]*\"[[:blank:]]*$ ]]; then
+        _CURRENT_KEY="$MULTILINE_KEY"
+        _CURRENT_VALUE="$MULTILINE_BUFFER"
+        MULTILINE_KEY=
+        MULTILINE_BUFFER=
       else
-        _CURRENT_VALUE="$(echo "$_CURRENT_VALUE" | envsubst)"
-        if [ ${#_VALID_KEYS[@]} -eq 0 ] || bashc.in_list _VALID_KEYS $_CURRENT_KEY; then
-          read -d '\0' "$_CURRENT_KEY" <<< "${_CURRENT_VALUE}"
-
-          # The value is exported so that it is available for the others subprocesses
-          export $_CURRENT_KEY
-        else
-          p_warning "$_CURRENT_KEY ignored"
-        fi
-        p_debug "$_CURRENT_KEY=$_CURRENT_VALUE"
+        continue
       fi
     else
-      if [ "${L%%\#*}" != "" ]; then
-        p_error "invalid configuration line '$L'"
-        _EXITCODE=$((_EXITCODE+1))
+      if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*=\"[^\"]*$ ]]; then
+        IFS='=' read _CURRENT_KEY _CURRENT_VALUE <<< "$L"
+        MULTILINE_KEY="$_CURRENT_KEY"
+        MULTILINE_BUFFER="$_CURRENT_VALUE"
+        continue
+      else
+        if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
+          IFS='=' read _CURRENT_KEY _CURRENT_VALUE <<< "$L"
+        else
+          if [ "${L%%\#*}" != "" ]; then
+            p_error "invalid configuration line '$L'"
+            _EXITCODE=$((_EXITCODE+1))
+          fi
+        fi
       fi
     fi
+
+    if [ "$_CURRENT_KEY" == "" ]; then
+      continue
+    fi
+
     if ((_EXITCODE>=254)); then
       p_error "too errors to consider this file"
       return $_EXITCODE
+    fi
+
+    _CURRENT_VALUE="$(bashc.cleanvalue "$_CURRENT_VALUE")"
+    if [ $? -ne 0 ]; then
+      p_warning "ignoring invalid value $_CURRENT_VALUE for key $_CURRENT_KEY"
+      _EXITCODE=$((_EXITCODE+1))
+    else
+      _CURRENT_VALUE="$(printf "$_CURRENT_VALUE" | envsubst)"
+      if [ ${#_VALID_KEYS[@]} -eq 0 ] || bashc.in_list _VALID_KEYS $_CURRENT_KEY; then
+        read -d '\0' "$_CURRENT_KEY" <<< "${_CURRENT_VALUE}"
+
+        # The value is exported so that it is available for the others subprocesses
+        export $_CURRENT_KEY
+      else
+        p_warning "$_CURRENT_KEY ignored"
+      fi
+      p_debug "$_CURRENT_KEY=$_CURRENT_VALUE"
+      _CURRENT_KEY=
+      _CURRENT_VALUE=
     fi
   done <<< "$_TXT_CONF"
   return $_EXITCODE
