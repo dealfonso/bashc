@@ -327,7 +327,7 @@ The functions that are included in the library
 - `bashc.ltrim`: remove leading blank spaces from a string.
 - `bashc.rtrim`: remove trailing blank spaces from a string
 - `bashc.build_cmdline`: builds a quoted commandline from the parameters to the function.
-- `bashc.dump_list`: dumps the list of parameters and prepends its position.
+- **deprecated** `bashc.dump_list`: (please use `bashc.dump_in_lines`) dumps the list of parameters and prepends its position.
 - `bashc.parameters_to_list`: converts a set of parameters to the function, to an array.
 - `bashc.list_append`: adds a value to the end of an array.
 - `bashc.in_list`: checks whether a value is in an array or not.
@@ -335,3 +335,6 @@ The functions that are included in the library
 - `bashc.arrayze_cmd`: creates an array of parameters from a commandline string.
 - `bashc.lines_to_array`: converts a set of lines to an array.
 - `bashc.cleanfile`: removes blank lines, bash-like comments, trailing and leading spaces from a string.
+- `bashc.dump_in_lines`: dumps the list of parameters and prepends its position.
+- `bashc.dump_vars`: dumps the value of the variables passed as parameters.
+- `bashc.expand_ranges`: expand ranges in strings such as `myrange[0-2]` into `myrange0, myrange1, myrange2` (it also support ranges of characters and reverse order).
