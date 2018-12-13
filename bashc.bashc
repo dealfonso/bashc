@@ -30,6 +30,8 @@ $0 <options> <script> -- <parameters>
                             using this mode it will not be sourced.
   --gzip-version|-G         Create a compressed version for the script (using gzip).
   --strip-functions|-S      Try to remove the unused functions (useful to create minimal commands)
+  --remove-blank-lines|-R   Try to remove the blank lines in the resulting code (useful to reduce the size of
+                            the resulting code while maintaining readability)
   --version | -V            Outputs the version number and finalizes.
   --verbose | -v            Shows more information about the procedure.
   --debug                   Shows a lot more information about the procedure.
@@ -49,6 +51,93 @@ function verify_dependencies() {
 }
 
 verify_dependencies
+
+function remove_blank_lines() {
+  local RESTOFCODE='
+    /^[\t ]*$/ {
+      if (!in_dquote && !in_squote && in_heredoc == "") {
+        next;
+      }
+    }
+    {
+      analized_str=$0;
+      
+      if (in_heredoc!="")
+        if (analized_str ~ "^" in_heredoc "[[:blank:]]*$") {
+          in_heredoc=""
+          # print as-is
+          print $0
+          # Jump the matched delimiter
+          next
+        }
+
+      # if in double quote, remove anything up othe double quote
+      if (in_dquote==1)
+        if (sub(/^[^"\\]*(\\.[^"\\]*)*"/,"", analized_str)) in_dquote=0;
+
+      # if in single quote, remove anything up the single quote
+      if (in_squote==1)
+        if (sub(/^[^'"'"']*'"'"'/,"", analized_str)) in_squote=0;
+
+      # if still in double quote or single quote, skip
+      if (in_dquote || in_squote || in_heredoc != "") {
+        print $0
+        next;
+      }
+
+      # Remove regex
+      sub(/\[\[:[a-zA-Z]*:\]\]/, "", analized_str);
+      while (sub(/\[\[ ([^\[]|\[[^\[])* \]\]/, "[[ ]]", analized_str));
+
+      # Remove quoted sentences
+      while (sub(/"[^"\\]*(\\.[^"\\]*)*"|'"'"'[^'"'"']*'"'"'/,"",analized_str));
+
+      i_comment=index(analized_str, "#");
+      i_squote=index(analized_str, "'"'"'");
+      i_dquote=index(analized_str, "\"");
+
+      if (i_comment == 0) i_comment=length(analized_str);
+      if (i_squote == 0) i_squote=length(analized_str);
+      if (i_dquote == 0) i_dquote=length(analized_str);
+
+      # Remove variable expressions (e.g. ${VAR}, ${#VAR[@]}, etc.)
+      sub(/\${[^}{]*}/,"", analized_str)
+
+      if (i_comment <= i_squote && i_comment <= i_dquote) {
+        # Remove comments (beware of the {#arr[@]} bash expansion)
+        sub(/#.*$/,"",analized_str);
+      }
+
+      if (i_squote <= i_dquote) {
+        if (sub(/'"'"'[^'"'"']*$/,"", analized_str)) 
+          in_squote=1;
+        if (sub(/"[^"\\]*(\\.[^"\\]*)*$/,"", analized_str))
+          in_dquote=1;
+      } else {
+        if (sub(/"[^"\\]*(\\.[^"\\]*)*$/,"", analized_str))
+          in_dquote=1;
+        if (sub(/'"'"'[^'"'"']*$/,"", analized_str)) 
+          in_squote=1;
+      }
+
+      if (match(analized_str, /<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+)/, matched)) {
+        in_heredoc=matched[2];
+        sub(/<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+).*$/,"", analized_str);
+      }
+
+      # If we had more closing braces, it is a bug in the original file
+      print $0
+      next;
+    }
+  '
+  echo "$1" | awk "
+    BEGIN {
+      in_squote=0;
+      in_dquote=0;
+    }
+    $RESTOFCODE
+  "
+}
 
 function getfunctions_fnc() {
   echo "$1" | awk '
@@ -84,7 +173,7 @@ function strip_fnc() {
       if (in_dquote || in_squote || in_heredoc != "") next;
 
       # Remove regex
-      # while (sub(/\[\[ ([^[\[]|\[[^\[])* \]\]/, "[[ ]]", analized_str));
+      sub(/\[\[:[a-zA-Z]*:\]\]/, "", analized_str);
       while (sub(/\[\[ ([^\[]|\[[^\[])* \]\]/, "[[ ]]", analized_str));
 
       # Remove quoted sentences
@@ -228,6 +317,8 @@ while bashc.parameters_next; do
     --debug)                DEBUG=true;;
     --help | -h)            usage && bashc.finalize;;
     --strip-functions | -S) STRIPFUNCTIONS=true;;
+    --remove-blank-lines | -R)
+                            REMOVEBLANKLINES=true;;
     --version|-V)           p_out "$VERSION"
                             bashc.finalize 0;;
     --|*)                   [ "$PARAM" == "--" ] && bashc.parameters_next
@@ -358,6 +449,12 @@ if [ "$STRIPFUNCTIONS" == "true" ]; then
   done
 
   echo "$F_CONTENT" > "$_TMPFILE1"
+fi
+
+if [ "$REMOVEBLANKLINES" == "true" ]; then
+  p_info "stripping unused functions"
+  F_CONTENT="$(cat "$_TMPFILE1")"
+  remove_blank_lines "$F_CONTENT" > "$_TMPFILE1"
 fi
 
 if [ "$COMPRESSEDVERSION" == "true" ]; then
