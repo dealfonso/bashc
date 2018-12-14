@@ -142,7 +142,7 @@ function bashc.lines_to_array() {
 }
 
 function bashc.sanitize() {
-  echo "$1" | sed -e 's/\([[\/.*]\|\]\)/\\&/g'
+  echo "$1" | sed -e 's/\\/\\\\/g; s/\//\\\//g; s/&/\\\&/g; s/\./\\\./g'
 }
 
 function bashc.cleanfile() {
