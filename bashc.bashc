@@ -41,16 +41,24 @@ EOF
 }
 
 function verify_dependencies() {
-  tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
-  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
-  gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
-  envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
-  gzip --version > /dev/null 2> /dev/null || bashc.finalize 1 "gzip not found"
-  gunzip --version > /dev/null 2> /dev/null || bashc.finalize 1 "gunzip not found"
-  base64 --version > /dev/null 2> /dev/null || bashc.finalize 1 "base64 not found"
+  local APPS="$@"
+  local APP
+  for APP in $APPS; do
+    help $APP > /dev/null 2> /dev/null || which $APP > /dev/null 2> /dev/null || bashc.finalize 1 "command $APP not found"
+  done
 }
 
-verify_dependencies
+if ! which envsubst > /dev/null 2>&1; then
+    function envsubst() {
+        local line
+        while read line; do
+            line=$( echo $line | sed 's/"/\\"/g' )
+            eval echo $line
+        done
+    }
+fi  
+
+verify_dependencies tar sed awk gzip gunzip base64
 
 function remove_blank_lines() {
   local RESTOFCODE='
@@ -101,7 +109,7 @@ function remove_blank_lines() {
       if (i_dquote == 0) i_dquote=length(analized_str);
 
       # Remove variable expressions (e.g. ${VAR}, ${#VAR[@]}, etc.)
-      sub(/\${[^}{]*}/,"", analized_str)
+      sub(/\$\{[^\}\{]*\}/,"", analized_str)
 
       if (i_comment <= i_squote && i_comment <= i_dquote) {
         # Remove comments (beware of the {#arr[@]} bash expansion)
@@ -120,9 +128,10 @@ function remove_blank_lines() {
           in_squote=1;
       }
 
-      if (match(analized_str, /<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+)/, matched)) {
-        in_heredoc=matched[2];
-        sub(/<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+).*$/,"", analized_str);
+      if (match(analized_str, /<<[[:blank:]]*[-\\]{0,1}[A-Za-z0-9]+/)) {
+        in_heredoc=substr(analized_str, RSTART, RLENGTH)
+        sub(/<<[[:blank:]]*[-\\]{0,1}/,"",in_heredoc);
+        sub(/<<[[:blank:]]*[-\\]{0,1}[A-Za-z0-9]+.*$/,"", analized_str);
       }
 
       # If we had more closing braces, it is a bug in the original file
@@ -141,9 +150,11 @@ function remove_blank_lines() {
 
 function getfunctions_fnc() {
   echo "$1" | awk '
-    /^[ \t]*function (.*)/{
-      match($0, /^[ \t]*function ([^{(]+).*{.*/, arr)
-      fncname=arr[1]
+    /^[ \t]*function ([^{(]+).*{.*/{
+      fncname=$0
+      sub(/^[ \t]*function /,"", fncname)
+      match(fncname, /^[^{(]+/)
+      fncname=substr(fncname, RSTART, RLENGTH)
       print fncname
     }
   ' 
@@ -188,7 +199,7 @@ function strip_fnc() {
       if (i_dquote == 0) i_dquote=length(analized_str);
 
       # Remove variable expressions (e.g. ${VAR}, ${#VAR[@]}, etc.)
-      sub(/\${[^}{]*}/,"", analized_str)
+      sub(/\$\{[^\}\{]*\}/,"", analized_str)
 
       if (i_comment <= i_squote && i_comment <= i_dquote) {
         # Remove comments (beware of the {#arr[@]} bash expansion)
@@ -207,9 +218,10 @@ function strip_fnc() {
           in_squote=1;
       }
 
-      if (match(analized_str, /<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+)/, matched)) {
-        in_heredoc=matched[2];
-        sub(/<<[[:blank:]]*(-|\\|)([A-Za-z0-9]+).*$/,"", analized_str);
+      if (match(analized_str, /<<[[:blank:]]*[-\\]{0,1}[A-Za-z0-9]+/)) {
+        in_heredoc=substr(analized_str, RSTART, RLENGTH)
+        sub(/<<[[:blank:]]*[-\\]{0,1}/,"",in_heredoc);
+        sub(/<<[[:blank:]]*[-\\]{0,1}[A-Za-z0-9]+.*$/,"", analized_str);
       }
 
       # If it is empty, skip
@@ -226,7 +238,7 @@ function strip_fnc() {
       next;
     }
   '
-  local FNC_NAME="${1//\./\\\.}"
+  local FNC_NAME="$(bashc.sanitize "$1")"
 
   echo "$2" | awk "
     /^[ \t]*function [ \t]*$FNC_NAME[ \t\({].*/{
@@ -257,10 +269,12 @@ function remove_unused_functions() {
     else
       p_debug "keeping function '$f'"
     fi
-    # p_debug "$i -----------------------------------------------------------"
-    # p_debug "$CURRENT_CONTENT"
-    # p_debug "$STRIPPED_CONTENT"
-    # p_debug "$i ==========================================================="
+: <<COMMENT
+    p_debug "$i -----------------------------------------------------------"
+    p_debug "$CURRENT_CONTENT"
+    p_debug "$STRIPPED_CONTENT"
+    p_debug "$i ==========================================================="
+COMMENT
     i=$((i+1))
   done
   echo "$CURRENT_CONTENT"
@@ -409,12 +423,20 @@ while [ "$HAVEWORK" == "true" ]; do
       fi
       if [ "$SOLVEINCLUDE" == "true" ]; then
         p_debug "including file $_SRC_FILE"
-        _CONTROLFIELD="$(cat /proc/sys/kernel/random/uuid)"
-        sed -e "0,/^[ \t]*$(bashc.sanitize "$_NXT_SRC")[ \t]*\$/s//$_CONTROLFIELD/"  -e "/$_CONTROLFIELD/ {
-        r $_SRC_FILE
-        a
-        d
-        }" "$_TMPFILE1" > "$_TMPFILE2" 
+        _REXP='^[ \t]*'"$(bashc.sanitize "$_NXT_SRC")"'[ \t]*$'
+        awk "
+        BEGIN { 
+          appeared=0;
+          while ((getline<\"$_TMPFILE1\")==1) {
+            if (!appeared && \$0 ~ /$_REXP/) {
+              appeared=1;
+              while ((getline<\"$_SRC_FILE\")==1) print;
+              close(\"$_SRC_FILE\")
+            } else
+              print;
+          }
+          close(\"$_TMPFILE1\")
+        }" > "$_TMPFILE2"
         _FILES_INCLUDED+=("$_SRC_FILE")
       else
         p_debug "skipping file $_SRC_FILE"
