@@ -124,6 +124,7 @@ function bashc.arrayze_cmd() {
   local AN="$1"
   local _CMD="$2"
   local R n=0
+  if [ "$R" == "" ]; then return; fi
   while read R; do
     read ${AN}[$n] <<< "$R"
     n=$((n+1))
