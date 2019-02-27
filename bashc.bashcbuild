@@ -4,7 +4,7 @@
 #   variable PACKAGE and not including the other variables. VERSION is also recommended.
 # The next lines are the example for the **bashc** package:
 PACKAGE=bashc
-VERSION=1.0-beta0
+VERSION=1.0-beta2
 SUMMARY="BASHc is similar to a compiler for bash applications"
 LICENSE="Apache 2.0"
 URL="https://github.com/dealfonso/bashc"
@@ -45,4 +45,4 @@ REQUIRES="bash tar coreutils gawk gettext rpm-build gzip"
 # This is a complex example: we need to execute some commands to generate the files that we'll copy in the final folder
 # In our case, we have 3 files (bashc, bashcbuild and bashcgen) and we want to run bashc over them, generate the REAL 
 #   executable files. We also need that the resulting files are marked as executables (chmod +x)
-/usr/bin/;bashc:bashcbuild:bashcgen;./bashc.bashc -o $SOURCEFOLDER/$FILEPATH -cCS $SOURCEFOLDER/${FILEPATH}.bashc;chmod +x $SOURCEFOLDER/$FILEPATH
+/usr/bin/;bashc:bashcbuild:bashcgen;./bashc.bashc -o $SOURCEFOLDER/$FILEPATH -cCSR $SOURCEFOLDER/${FILEPATH}.bashc;chmod +x $SOURCEFOLDER/$FILEPATH
