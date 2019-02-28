@@ -22,8 +22,17 @@ function bashc.rtrim() {
 
 function bashc.build_cmdline() {
   local SHCMDLINE=""
+  local SPECIAL=( "|" ";" "&" "&&" ">" ">>" "2>" "2>>" "<" "<<" "<<<" "<(" "(" ")" )
+  local ISSPECIAL S
   while [ $# -gt 0 ]; do
-    if [ "$1" == "|" -o "$1" == "&&" -o "$1" == ">" -o "$1" == ">>" -o "$1" == "2>" -o "$1" == "2>>" -o "$1" == "<" -o "$1" == "<<" ]; then
+    ISSPECIAL=
+    for S in "${SPECIAL[@]}"; do
+      if [ "$1" == "$S" ]; then 
+        ISSPECIAL=true
+        break
+      fi
+    done
+    if [ "$ISSPECIAL" == "true" ]; then
       SHCMDLINE="${SHCMDLINE} $1"
     else
       SHCMDLINE="${SHCMDLINE} \"$1\""
