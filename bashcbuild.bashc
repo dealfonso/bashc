@@ -28,6 +28,7 @@ $0 <options> <package description>
 
   --rpm                     Generate a RPM package
   --deb                     Generate a DEB package
+  --ppa                     Generate PPA files in a package
   --package-name| -N <package name>       
                             Sets the package name (it is used to create the filenames)
   --output-folder | -o <folder>
@@ -117,25 +118,29 @@ function build_deb() {
   PACKAGEBUILD="${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
   mkdir -p "${PACKAGEBUILD}/DEBIAN"
 
-  cat > "${PACKAGEBUILD}/DEBIAN/control" << EOF
-Package: ${PACKAGE}
-Version: ${VERSION}-${REVISION}
+  p_debug "building .deb in ${PACKAGEBUILD}"
+
+  local CONTROLFILE="Version: ${VERSION}-${REVISION}
 Section: base
-Priority: optional
-Architecture: all
-EOF
+Priority: optional"
+  local CONTROLCOMMON="Package: ${PACKAGE}
+Architecture: all"
   if [ "$DEPENDS" != "" ]; then
-    echo "Depends: ${DEPENDS}" >> "${PACKAGEBUILD}/DEBIAN/control"
+    CONTROLCOMMON="${CONTROLCOMMON}
+Depends: ${DEPENDS}"
   fi
   if [ "$PACKAGER" != "" ]; then
-    echo "Maintainer: ${PACKAGER}" >> "${PACKAGEBUILD}/DEBIAN/control"
+    CONTROLFILE="${CONTROLFILE}
+Maintainer: ${PACKAGER}"
   fi
   if [ "$DESCRIPTION" != "" ]; then
-    cat >> "${PACKAGEBUILD}/DEBIAN/control" << EOF
+    CONTROLCOMMON="${CONTROLCOMMON}
 Description: ${PACKAGE}
-$(echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}')
-EOF
+$(echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}')"
   fi
+
+  echo "${CONTROLFILE}
+${CONTROLCOMMON}" > "${PACKAGEBUILD}/DEBIAN/control"
 
   cat > "${PACKAGEBUILD}/DEBIAN/preinst" <<\EOF
 #!/bin/sh
@@ -175,6 +180,128 @@ EOF
   else
     return 1
   fi
+
+  return 0
+}
+
+function build_ppa() {
+  local BUILDFOLDER="$1"
+  local PACKAGE="$2"
+  local VERSION="$3"
+
+  local REVISION=${VERSION##*-}
+
+  if [ "$REVISION" == "$VERSION" ]; then
+    REVISION="0"
+  fi
+
+  VERSION=${VERSION%%-*}
+
+  p_debug "version: $VERSION revision: $REVISION"
+
+  if [ "$TMPDIR" == "" ]; then
+    TMPDIR="$(bashc.tempdir)"
+  fi
+
+  p_debug "building package from $BUILDFOLDER"
+
+  cp -r "$BUILDFOLDER" "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+
+  PACKAGEBUILD="${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+
+  local CONTROLCOMMON="Package: ${PACKAGE}
+Architecture: all"
+  if [ "$DEPENDS" != "" ]; then
+    CONTROLCOMMON="${CONTROLCOMMON}
+Depends: ${DEPENDS}"
+  fi
+  if [ "$DESCRIPTION" != "" ]; then
+    CONTROLCOMMON="${CONTROLCOMMON}
+Description: ${PACKAGE}
+$(echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}')"
+  fi
+
+  local CONFFILES=
+  pushd "${PACKAGEBUILD}/etc" > /dev/null 2> /dev/null
+  [ $? -eq 0 ] && CONFFILES="$(find * -type f -printf '/etc/%p\n')" && popd > /dev/null
+  popd > /dev/null 2> /dev/null
+
+  pushd "${PACKAGEBUILD}" > /dev/null 2> /dev/null
+  local ALLFILES="$(find . -type f -printf "%P\n")"
+
+  dh_make -p "${PACKAGE}_${VERSION}-${REVISION}" --indep --createorig -y > /dev/null 2> /dev/null
+  if [ $? -ne 0 ]; then
+    p_error "failed to execute dh_make"
+    return 1
+  fi
+  rm debian/*{ex,EX} debian/*.docs debian/README.* debian/copyright
+
+  cat > debian/control <<EOT
+Source: ${PACKAGE}
+Section: base
+Priority: optional
+Maintainer: ${PACKAGER}
+Build-Depends: debhelper (>=9)
+Standards-Version: 3.9.7
+
+${CONTROLCOMMON}
+EOT
+
+  cat > "${PACKAGEBUILD}/debian/preinst" <<\EOF
+#!/bin/sh
+EOF
+
+  cat > "${PACKAGEBUILD}/debian/postinst" <<\EOF
+#!/bin/sh
+EOF
+
+  cat > "${PACKAGEBUILD}/debian/postrm" <<\EOF
+#!/bin/sh
+EOF
+
+  cat > "${PACKAGEBUILD}/debian/prerm" <<\EOF
+#!/bin/sh
+EOF
+
+  chmod +x "${PACKAGEBUILD}/debian/postinst"
+  chmod +x "${PACKAGEBUILD}/debian/postrm"
+  chmod +x "${PACKAGEBUILD}/debian/preinst"
+  chmod +x "${PACKAGEBUILD}/debian/prerm"
+
+  if [ "$CONFFILES" != "" ]; then
+    echo "$CONFFILES" > "${PACKAGEBUILD}/debian/conffiles"
+  fi
+
+  if [ "$ALLFILES" != "" ]; then
+    local L
+    while read L; do
+      echo "${L} ${L}" >> "${PACKAGEBUILD}/debian/install"
+    done <<< "$ALLFILES"
+  fi
+
+  cat > "${PACKAGEBUILD}/../README" <<EOT
+This file contains the basic file needed to create your files to upload to ppa.
+
+Now you MUST complete the next steps:
+1. Update the file ${PACKAGE}_${VERSION}-${REVISION}/debian/changelog 
+   - Explain the changes in this version.
+   - Change the word "unstable" to match the target ubuntu release (e.g. xenial)
+   - Update the maintainer's name and e-mail to match the GPG key that you want to use for signing the files
+2. Build the ppa package files
+     cd ${PACKAGE}_${VERSION}-${REVISION}
+     debuild -S
+     cd -
+3. Upload the ppa package
+     dput ppa:myppa/name ${PACKAGE}_${VERSION}-${REVISION}_source.changes
+EOT
+
+  tar czf "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" -C "${PACKAGEBUILD}/.." "${PACKAGE}_${VERSION}-${REVISION}" "${PACKAGE}_${VERSION}-${REVISION}.orig.tar.xz" "README"
+  if [ $? -eq 0 ]; then
+    echo "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz"
+  else
+    return 1
+  fi
+
   return 0
 }
 
@@ -338,6 +465,7 @@ while bashc.parameters_next; do
   case "$PARAM" in
     --rpm)                  GENERATE_RPM=true;;
     --deb)                  GENERATE_DEB=true;;
+    --ppa)                  GENERATE_PPA=true;;
     --keep-temporary|-T)    KEEP_TEMPORARY=true;;
     --keep-buildfolder|-k)  KEEP_BUILDFOLDER=true;;
     --package-name| -N)     bashc.parameters_next
@@ -570,6 +698,18 @@ if [ "$GENERATE_DEB" == "true" ]; then
   fi
   cp "$DEBFILE" "$OUTPUT_FOLDER/"
   p_out "$OUTPUT_FOLDER/$(basename "$DEBFILE") successfully created"
+fi
+
+if [ "$GENERATE_PPA" == "true" ]; then
+  PPAFILE="$(build_ppa "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+  if [ "$PPAFILE" == "" ]; then
+    p_error "failed to generate the -ppa file"
+    if [ "$HALTONERRORS" == "true" ]; then
+      bashc.finalize 1
+    fi
+  fi
+  cp "$PPAFILE" "$OUTPUT_FOLDER/"
+  p_out "$OUTPUT_FOLDER/$(basename "$PPAFILE") successfully created"
 fi
 
 if [ "$KEEP_BUILDFOLDER" != "true" ]; then
