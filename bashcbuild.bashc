@@ -113,9 +113,12 @@ function build_deb() {
 
   p_debug "building package from $BUILDFOLDER"
 
-  cp -r "$BUILDFOLDER" "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+  local DEB_TMPDIR="${TMPDIR}/deb"
+  mkdir -p "${DEB_TMPDIR}"
 
-  PACKAGEBUILD="${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+  cp -r "$BUILDFOLDER" "${DEB_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+
+  PACKAGEBUILD="${DEB_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
   mkdir -p "${PACKAGEBUILD}/DEBIAN"
 
   p_debug "building .deb in ${PACKAGEBUILD}"
@@ -176,7 +179,7 @@ EOF
 
   fakeroot dpkg-deb --build "${PACKAGEBUILD}" > /dev/null 2> /dev/null
   if [ $? -eq 0 ]; then
-    echo "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}.deb"
+    echo "${DEB_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}.deb"
   else
     return 1
   fi
@@ -205,9 +208,12 @@ function build_ppa() {
 
   p_debug "building package from $BUILDFOLDER"
 
-  cp -r "$BUILDFOLDER" "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+  local PPA_TMPDIR="${TMPDIR}/ppa"
+  mkdir -p "${PPA_TMPDIR}"
 
-  PACKAGEBUILD="${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+  cp -r "$BUILDFOLDER" "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
+
+  PACKAGEBUILD="${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
 
   local CONTROLCOMMON="Package: ${PACKAGE}
 Architecture: all"
@@ -295,9 +301,9 @@ Now you MUST complete the next steps:
      dput ppa:myppa/name ${PACKAGE}_${VERSION}-${REVISION}_source.changes
 EOT
 
-  tar czf "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" -C "${PACKAGEBUILD}/.." "${PACKAGE}_${VERSION}-${REVISION}" "${PACKAGE}_${VERSION}-${REVISION}.orig.tar.xz" "README"
+  tar czf "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" -C "${PACKAGEBUILD}/.." "${PACKAGE}_${VERSION}-${REVISION}" "${PACKAGE}_${VERSION}-${REVISION}.orig.tar.xz" "README"
   if [ $? -eq 0 ]; then
-    echo "${TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz"
+    echo "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz"
   else
     return 1
   fi
@@ -715,9 +721,13 @@ fi
 if [ "$KEEP_BUILDFOLDER" != "true" ]; then
   p_debug "removing build folder $BUILDFOLDER"
   rm -rf "$BUILDFOLDER" > /dev/null 2> /dev/null
+else
+  p_out "keeping build folder: $BUILDFOLDER"
 fi
 
 if [ "$KEEP_TEMPORARY" != "true" ]; then
   p_debug "removing temporary folder $TMPDIR"
   rm -rf "$TMPDIR" > /dev/null 2> /dev/null
+else
+  p_out "keeping temporary folder: $TMPDIR"
 fi
