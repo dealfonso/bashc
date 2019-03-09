@@ -29,7 +29,7 @@ function bashc.readconffile() {
   fi
 
   # First we read the config file
-  _TXT_CONF="$(cat "$_CONF_FILE" | sed 's/^[ \t]*//g' | sed 's/[ \t]*$//g' | sed '/^$/d')"
+  _TXT_CONF="$(cat "$_CONF_FILE" | sed $'s/^[ \t]*//g' | sed $'s/[ \t]*$//g' | sed '/^$/d')"
 
   shift
   if [ $# -gt 0 ]; then
