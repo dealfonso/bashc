@@ -208,7 +208,7 @@ function build_ppa() {
 
   p_debug "building package from $BUILDFOLDER"
 
-  local PPA_TMPDIR="${TMPDIR}/ppa"
+  local PPA_TMPDIR="${TMPDIR}/ppa/${PACKAGE}_${VERSION}-${REVISION}-ppa"
   mkdir -p "${PPA_TMPDIR}"
 
   cp -r "$BUILDFOLDER" "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
@@ -227,14 +227,17 @@ Description: ${PACKAGE}
 $(echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}')"
   fi
 
+  # We'll supose that the files in etc folder are configuration files
   local CONFFILES=
   pushd "${PACKAGEBUILD}/etc" > /dev/null 2> /dev/null
   [ $? -eq 0 ] && CONFFILES="$(find * -type f -printf '/etc/%p\n')" && popd > /dev/null
   popd > /dev/null 2> /dev/null
 
+  # Now we'll detect all the files to detect where to copy them and (if we want) md5sum them
   pushd "${PACKAGEBUILD}" > /dev/null 2> /dev/null
   local ALLFILES="$(find . -type f -printf "%P\n")"
 
+  # PRepare the "debian" folder structure using the standard tools
   dh_make -p "${PACKAGE}_${VERSION}-${REVISION}" --indep --createorig -y > /dev/null 2> /dev/null
   if [ $? -ne 0 ]; then
     p_error "failed to execute dh_make"
@@ -242,6 +245,13 @@ $(echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}')"
   fi
   rm debian/*{ex,EX} debian/*.docs debian/README.* debian/copyright
 
+  # If we can get the distribution we'll try to put it in the changelog file
+  local UBUNTU_RELEASE="$(lsb_release -cs)"
+  if [ $? -eq 0 -a "$UBUNTU_RELEASE" != "" ]; then
+    sed -i "s/unstable/$UBUNTU_RELEASE/" debian/changelog
+  fi
+
+  # Now we create a basic control file
   cat > debian/control <<EOT
 Source: ${PACKAGE}
 Section: base
@@ -253,20 +263,41 @@ Standards-Version: 3.9.7
 ${CONTROLCOMMON}
 EOT
 
+  # Let's prepare the empty installation scripts
   cat > "${PACKAGEBUILD}/debian/preinst" <<\EOF
 #!/bin/sh
+case $1 in
+  install|upgrade|abort-upgrade)    
+                    exit 0;;
+  *)                exit 1;;
+esac
 EOF
 
   cat > "${PACKAGEBUILD}/debian/postinst" <<\EOF
 #!/bin/sh
+case $1 in
+  configure|abort-remove|abort-upgrade|abort-deconfigure)    
+                    exit 0;;
+  *)                exit 1;;
+esac
 EOF
 
   cat > "${PACKAGEBUILD}/debian/postrm" <<\EOF
 #!/bin/sh
+case $1 in
+  remove|purge|upgrade|failed-upgrade|abort-install|abort-upgrade)    
+                    exit 0;;
+  *)                exit 1;;
+esac
 EOF
 
   cat > "${PACKAGEBUILD}/debian/prerm" <<\EOF
 #!/bin/sh
+case $1 in
+  remove|upgrade|deconfigure|failed-upgrade)    
+                    exit 0;;
+  *)                exit 1;;
+esac
 EOF
 
   chmod +x "${PACKAGEBUILD}/debian/postinst"
@@ -274,17 +305,20 @@ EOF
   chmod +x "${PACKAGEBUILD}/debian/preinst"
   chmod +x "${PACKAGEBUILD}/debian/prerm"
 
+  # Now detect the configuration files to avoid overwritting them during installation
   if [ "$CONFFILES" != "" ]; then
     echo "$CONFFILES" > "${PACKAGEBUILD}/debian/conffiles"
   fi
 
+  # Now determine where to put the files
   if [ "$ALLFILES" != "" ]; then
     local L
     while read L; do
-      echo "${L} ${L}" >> "${PACKAGEBUILD}/debian/install"
+      echo "${L} $(dirname "${L}")" >> "${PACKAGEBUILD}/debian/install"
     done <<< "$ALLFILES"
   fi
 
+  # Simple readme on how to prepare a ppa package
   cat > "${PACKAGEBUILD}/../README" <<EOT
 This file contains the basic file needed to create your files to upload to ppa.
 
@@ -301,7 +335,8 @@ Now you MUST complete the next steps:
      dput ppa:myppa/name ${PACKAGE}_${VERSION}-${REVISION}_source.changes
 EOT
 
-  tar czf "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" -C "${PACKAGEBUILD}/.." "${PACKAGE}_${VERSION}-${REVISION}" "${PACKAGE}_${VERSION}-${REVISION}.orig.tar.xz" "README"
+  # Create a compressed file that contains all these files ready to be built
+  tar cfz "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" -C "${PPA_TMPDIR}/.." "${PACKAGE}_${VERSION}-${REVISION}-ppa"
   if [ $? -eq 0 ]; then
     echo "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz"
   else
