@@ -92,6 +92,52 @@ function verify_dependencies() {
   envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
 }
 
+function _deb_scripts() {
+  local FOLDER="$1"
+
+  # Let's prepare the empty installation scripts
+  local DEFAULT_PREINST="#!/bin/sh
+case $1 in
+  install|upgrade|abort-upgrade)    
+                    exit 0;;
+  *)                exit 1;;
+esac"
+  local _PREINST="${PREINST:-$DEFAULT_PREINST}"
+  echo "$_PREINST" > "${FOLDER}/preinst"
+
+  local DEFAULT_POSTINST="#!/bin/sh
+case $1 in
+  configure|abort-remove|abort-upgrade|abort-deconfigure)    
+                    exit 0;;
+  *)                exit 1;;
+esac"
+  local _POSTINST="${POSTINST:-$DEFAULT_POSTINST}"
+  echo "$_POSTINST" > "${FOLDER}/postinst"
+
+  local DEFAULT_POSTRM="#!/bin/sh
+case $1 in
+  remove|purge|upgrade|failed-upgrade|abort-install|abort-upgrade)    
+                    exit 0;;
+  *)                exit 1;;
+esac"
+  local _POSTRM="${POSTRM:-DEFAULT_POSTRM}"
+  echo "$_POSTRM" > "${FOLDER}/postrm"
+
+  local DEFAULT_PRERM="#!/bin/sh
+case $1 in
+  remove|upgrade|deconfigure|failed-upgrade)    
+                    exit 0;;
+  *)                exit 1;;
+esac"
+  local _PRERM="${PRERM:-DEFAULT_PRERM}"
+  echo "$_PRERM" > "${FOLDER}/prerm"
+
+  chmod +x "${FOLDER}/postinst"
+  chmod +x "${FOLDER}/postrm"
+  chmod +x "${FOLDER}/preinst"
+  chmod +x "${FOLDER}/prerm"  
+}
+
 function build_deb() {
   local BUILDFOLDER="$1"
   local PACKAGE="$2"
@@ -145,26 +191,7 @@ $(echo "$DESCRIPTION" | fold -s -w 80 | awk '{printf "  %s\n", $0}')"
   echo "${CONTROLFILE}
 ${CONTROLCOMMON}" > "${PACKAGEBUILD}/DEBIAN/control"
 
-  cat > "${PACKAGEBUILD}/DEBIAN/preinst" <<\EOF
-#!/bin/sh
-EOF
-
-  cat > "${PACKAGEBUILD}/DEBIAN/postinst" <<\EOF
-#!/bin/sh
-EOF
-
-  cat > "${PACKAGEBUILD}/DEBIAN/postrm" <<\EOF
-#!/bin/sh
-EOF
-
-  cat > "${PACKAGEBUILD}/DEBIAN/prerm" <<\EOF
-#!/bin/sh
-EOF
-
-  chmod +x "${PACKAGEBUILD}/DEBIAN/postinst"
-  chmod +x "${PACKAGEBUILD}/DEBIAN/postrm"
-  chmod +x "${PACKAGEBUILD}/DEBIAN/preinst"
-  chmod +x "${PACKAGEBUILD}/DEBIAN/prerm"
+  _deb_scripts "${PACKAGEBUILD}/DEBIAN"
 
   pushd $PACKAGEBUILD/etc > /dev/null 2> /dev/null
   [ $? -eq 0 ] && CONFFILES="$(find * -type f -printf '/etc/%p\n')" && popd > /dev/null
@@ -263,47 +290,7 @@ Standards-Version: 3.9.7
 ${CONTROLCOMMON}
 EOT
 
-  # Let's prepare the empty installation scripts
-  cat > "${PACKAGEBUILD}/debian/preinst" <<\EOF
-#!/bin/sh
-case $1 in
-  install|upgrade|abort-upgrade)    
-                    exit 0;;
-  *)                exit 1;;
-esac
-EOF
-
-  cat > "${PACKAGEBUILD}/debian/postinst" <<\EOF
-#!/bin/sh
-case $1 in
-  configure|abort-remove|abort-upgrade|abort-deconfigure)    
-                    exit 0;;
-  *)                exit 1;;
-esac
-EOF
-
-  cat > "${PACKAGEBUILD}/debian/postrm" <<\EOF
-#!/bin/sh
-case $1 in
-  remove|purge|upgrade|failed-upgrade|abort-install|abort-upgrade)    
-                    exit 0;;
-  *)                exit 1;;
-esac
-EOF
-
-  cat > "${PACKAGEBUILD}/debian/prerm" <<\EOF
-#!/bin/sh
-case $1 in
-  remove|upgrade|deconfigure|failed-upgrade)    
-                    exit 0;;
-  *)                exit 1;;
-esac
-EOF
-
-  chmod +x "${PACKAGEBUILD}/debian/postinst"
-  chmod +x "${PACKAGEBUILD}/debian/postrm"
-  chmod +x "${PACKAGEBUILD}/debian/preinst"
-  chmod +x "${PACKAGEBUILD}/debian/prerm"
+  _deb_scripts "${PACKAGEBUILD}/debian"
 
   # Now detect the configuration files to avoid overwritting them during installation
   if [ "$CONFFILES" != "" ]; then
@@ -476,12 +463,12 @@ function build_tar() {
 }
 
 function acquire_vars_from_buffer() {
-  BUFFER_VARS="$1"
+  local BUFFER_VARS="$1"
   # Process the extra buffer
   if [ "$BUFFER_VARS" != "" ]; then
     p_debug "will process this buffer of vars:
   $BUFFER_VARS"
-    bashc.readconf "$BUFFER_VARS" SUMMARY URL DESCRIPTION LICENSE PACKAGER DEPENDS REQUIRES PACKAGE VERSION
+    bashc.readconf "$BUFFER_VARS" SUMMARY URL DESCRIPTION LICENSE PACKAGER DEPENDS REQUIRES PACKAGE VERSION PREINST POSTINST PRERM POSTRM
     return 0
   fi
   return 1
@@ -559,23 +546,52 @@ export FILENAME=
 export FILEPATH=
 
 BUFFER_VARS=
-# We are reading the lines in the bashcbuild file
-while read L || [ "$BUFFER_VARS" != "" ]; do
-  p_debug "build line: $L"
-  IFS=';' read DESTINATION SOURCES COMMANDS <<< "$L"
-  # NOTE: It should be [ $L != "" ] && { [ $SOURCES == "" ] || [[ ... ]]; }; but I'm not sure of that syntax.
-  #       anyway this expression is valid because because $L =~ <nonempty> implies that $L != "" 
-  if [ "$L" != "" -a  "$SOURCES" == "" ] || [[ "$L" =~ ^[a-zA-Z][a-zA-Z0-9_]*= ]]; then
-    p_info "not copying line $L"
-    BUFFER_VARS="${BUFFER_VARS}${L}
-"
-    continue
-  else
-    acquire_vars_from_buffer "$BUFFER_VARS"
-    BUFFER_VARS=
-    if [ "$L" == "" ]; then
+
+while read; do
+  L="$REPLY"
+  p_debug "Line from file: $L"
+
+  if [ "$MULTILINE_BUFFER" != "" ]; then
+    MULTILINE_BUFFER="${MULTILINE_BUFFER}
+${L}"
+    if [[ "$L" =~ [^\"]*\"[[:blank:]]*$ ]]; then
+      BUFFER_VARS="$BUFFER_VARS
+$MULTILINE_BUFFER"
+      MULTILINE_BUFFER=
+      # Now the line is part of the multiline buffer
+      L=
+    else
       continue
     fi
+  else
+    if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*=\"[^\"]*$ ]]; then
+      MULTILINE_BUFFER="$L"
+      continue
+    else
+      if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
+        BUFFER_VARS="$BUFFER_VARS
+$L"
+        continue
+      fi
+    fi
+  fi
+
+  # If we get to here, it is not a var definition, so we'll process the buffer of variables if exists and continue with the commands
+  if [ "$BUFFER_VARS" != "" ]; then
+    acquire_vars_from_buffer "$BUFFER_VARS"
+    BUFFER_VARS=
+  fi
+  L="$(bashc.trim "${L%%#*}")"
+  if [ "$L" == "" ]; then
+    continue
+  fi
+
+  p_debug "build line: $L"
+  IFS=';' read DESTINATION SOURCES COMMANDS <<< "$L"
+
+  if [ "$SOURCES" == "" ]; then
+    p_warning "skipping invalid line $L"
+    continue
   fi
 
   # If we stated a destination, we'll create the folder (even if there are not any file that triggers copying or running commands)
@@ -699,7 +715,7 @@ $RESULT"
       fi
     done <<< "$SOURCEFILES"
   done <<< "${SOURCES}:"
-done < <(bashc.cleanfile "$FILETOBUILD")
+done <<< "$BUILDINFO"
 
 if [ "$PACKAGE" == "" ] || [[ ! "$PACKAGE" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
   read -p "Package name not provided (or it is invalid). Please provide one name for the package (blank or Ctrl-C finalizes): " PACKAGE
