@@ -110,7 +110,8 @@ function bashc.readconf() {
   local MULTILINE_BUFFER=
   local _CURRENT_SECTION=
   # Let's read the lines
-  while read L; do
+  while read; do
+    L="$REPLY"
     if [ "$MULTILINE_KEY" != "" ]; then
       MULTILINE_BUFFER="${MULTILINE_BUFFER}\n${L}"
       if [[ "$L" =~ [^\"]*\"[[:blank:]]*$ ]]; then

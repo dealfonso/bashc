@@ -143,10 +143,9 @@ function bashc.arrayze_cmd() {
 function bashc.lines_to_array() {
   local AN="$1"
   local LINES="$2"
-  local L
   local n=0
-  while read L; do
-    read ${AN}[$n] <<< "$L"
+  while read; do
+    read ${AN}[$n] <<< "$REPLY"
     n=$((n+1))
   done <<< "$LINES"
 }
