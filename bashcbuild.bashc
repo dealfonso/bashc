@@ -413,6 +413,8 @@ mkdir -p $RPM_BUILD_ROOT
 cp -r * $RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
+%pre
+%preun
 %post
 %postun
 EOF
@@ -504,6 +506,7 @@ bashc.parameters_start
 while bashc.parameters_next; do
   PARAM="$(bashc.parameters_current)"
   case "$PARAM" in
+    --test)                 TESTFILE=true;;
     --rpm)                  GENERATE_RPM=true;;
     --deb)                  GENERATE_DEB=true;;
     --ppa)                  GENERATE_PPA=true;;
@@ -710,47 +713,51 @@ if [ "$VERSION" == "" ]; then
   VERSION=0.0
 fi
 
-TARFILE="$(build_tar "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
-if [ "$TARFILE" == "" ]; then
-  bashc.finalize 1 "failed to generate the tar file"
-fi
-cp "$TARFILE" "$OUTPUT_FOLDER/"
-p_out "$OUTPUT_FOLDER/$(basename "$TARFILE") successfully created"
-
-if [ "$GENERATE_RPM" == "true" ]; then
-  RPMFILE="$(build_rpm "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
-  if [ "$RPMFILE" == "" ]; then
-    p_error "failed to generate the rpm file"
-    if [ "$HALTONERRORS" == "true" ]; then
-      bashc.finalize 1
-    fi
+if [ "$TESTFILE" == "true" ]; then
+  p_out "just testing... not building"
+else
+  TARFILE="$(build_tar "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+  if [ "$TARFILE" == "" ]; then
+    bashc.finalize 1 "failed to generate the tar file"
   fi
-  cp "$RPMFILE" "$OUTPUT_FOLDER/"
-  p_out "$OUTPUT_FOLDER/$(basename "$RPMFILE") successfully created"
-fi
+  cp "$TARFILE" "$OUTPUT_FOLDER/"
+  p_out "$OUTPUT_FOLDER/$(basename "$TARFILE") successfully created"
 
-if [ "$GENERATE_DEB" == "true" ]; then
-  DEBFILE="$(build_deb "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
-  if [ "$DEBFILE" == "" ]; then
-    p_error "failed to generate the deb file"
-    if [ "$HALTONERRORS" == "true" ]; then
-      bashc.finalize 1
+  if [ "$GENERATE_RPM" == "true" ]; then
+    RPMFILE="$(build_rpm "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+    if [ "$RPMFILE" == "" ]; then
+      p_error "failed to generate the rpm file"
+      if [ "$HALTONERRORS" == "true" ]; then
+        bashc.finalize 1
+      fi
     fi
+    cp "$RPMFILE" "$OUTPUT_FOLDER/"
+    p_out "$OUTPUT_FOLDER/$(basename "$RPMFILE") successfully created"
   fi
-  cp "$DEBFILE" "$OUTPUT_FOLDER/"
-  p_out "$OUTPUT_FOLDER/$(basename "$DEBFILE") successfully created"
-fi
 
-if [ "$GENERATE_PPA" == "true" ]; then
-  PPAFILE="$(build_ppa "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
-  if [ "$PPAFILE" == "" ]; then
-    p_error "failed to generate the -ppa file"
-    if [ "$HALTONERRORS" == "true" ]; then
-      bashc.finalize 1
+  if [ "$GENERATE_DEB" == "true" ]; then
+    DEBFILE="$(build_deb "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+    if [ "$DEBFILE" == "" ]; then
+      p_error "failed to generate the deb file"
+      if [ "$HALTONERRORS" == "true" ]; then
+        bashc.finalize 1
+      fi
     fi
+    cp "$DEBFILE" "$OUTPUT_FOLDER/"
+    p_out "$OUTPUT_FOLDER/$(basename "$DEBFILE") successfully created"
   fi
-  cp "$PPAFILE" "$OUTPUT_FOLDER/"
-  p_out "$OUTPUT_FOLDER/$(basename "$PPAFILE") successfully created"
+
+  if [ "$GENERATE_PPA" == "true" ]; then
+    PPAFILE="$(build_ppa "$BUILDFOLDER" "$PACKAGE" "$VERSION")"
+    if [ "$PPAFILE" == "" ]; then
+      p_error "failed to generate the -ppa file"
+      if [ "$HALTONERRORS" == "true" ]; then
+        bashc.finalize 1
+      fi
+    fi
+    cp "$PPAFILE" "$OUTPUT_FOLDER/"
+    p_out "$OUTPUT_FOLDER/$(basename "$PPAFILE") successfully created"
+  fi
 fi
 
 if [ "$KEEP_BUILDFOLDER" != "true" ]; then
