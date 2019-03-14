@@ -1,0 +1,36 @@
+# An array of undo commands
+__BASHC_UNDO_COMMANDS=()
+function bashc.undo_add() {
+  __BASHC_UNDO_COMMANDS=( "$*" "${__BASHC_UNDO_COMMANDS[@]}" )
+}
+
+function bashc.undo_dump() {
+  set +x
+  local f
+  local O=
+  for f in "${__BASHC_UNDO_COMMANDS[@]}"; do
+    O="$O
+$f"
+  done
+  p_debug "the system has been modified. To undo the changes please execute: 
+$O"
+}
+
+function bashc.undo_exec() {
+  local f
+  local CMD=
+  for f in "${__BASHC_UNDO_COMMANDS[@]}"; do
+    CMD=()
+    bashc.arrayze_cmd CMD "$f"
+    p_debug "executing ${CMD[@]}"
+    "${CMD[@]}"
+  done
+}
+
+function bashc.undo_dumponexit() {
+  trap bashc.dumpundo EXIT
+}
+
+function bashc.undo_execonexit() {
+  trap bashc.dumpundo EXIT
+}
