@@ -362,6 +362,39 @@ function build_rpm() {
   tar czf ${RPM_TMPDIR}/${PACKAGE}-${VERSION}.tar.gz -C "$RPM_TMPDIR" ${PACKAGE}-${VERSION}
   local TARFILES="$(tar tf ${RPM_TMPDIR}/${PACKAGE}-${VERSION}.tar.gz | sed "s/${PACKAGE}-${VERSION}//g" | sed '/\/$/d')"
 
+  local _DEFAULT_RPM_PRE="#!/bin/sh
+if [ $1 == 1 ]; then
+  echo 'installing'
+elif [ $1 == 2 ]; then
+  echo 'upgrading'
+fi"
+
+  local _DEFAULT_RPM_POST="#!/bin/sh
+if [ $1 == 1 ]; then
+  echo 'installing'
+elif [ $1 == 2 ]; then
+  echo 'upgrading'
+fi"
+
+  local _DEFAULT_RPM_PREUN="#!/bin/sh
+if [ $1 == 1 ]; then
+  echo 'upgrading'
+elif [ $1 == 0 ]; then
+  echo 'uninstalling'
+fi"
+
+  local _DEFAULT_RPM_POSTUN="#!/bin/sh
+if [ $1 == 1 ]; then
+  echo 'upgrading'
+elif [ $1 == 0 ]; then
+  echo 'uninstalling'
+fi"
+
+  local _RPM_PRE="${RPM_PRE:-_DEFAULT_PRE}"
+  local _RPM_PREUN="${RPM_PREUN:-_DEFAULT_PREUN}"
+  local _RPM_POST="${RPM_POST:-_DEFAULT_POST}"
+  local _RPM_POSTUN="${RPM_POSTUN:-_DEFAULT_POSTUN}"
+
   cat > ${RPM_TMPDIR}/${PACKAGE}.spec <<EOF
 %define version $VERSION
 %define revision $REVISION
@@ -401,9 +434,13 @@ cp -r * $RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 %pre
+$_RPM_PRE
 %preun
+$_RPM_PREUN
 %post
+$_RPM_POST
 %postun
+$_RPM_POSTUN
 EOF
   cat >> ${RPM_TMPDIR}/${PACKAGE}.spec <<EOF
 %files
@@ -468,7 +505,7 @@ function acquire_vars_from_buffer() {
   if [ "$BUFFER_VARS" != "" ]; then
     p_debug "will process this buffer of vars:
   $BUFFER_VARS"
-    bashc.readconf "$BUFFER_VARS" SUMMARY URL DESCRIPTION LICENSE PACKAGER DEPENDS REQUIRES PACKAGE VERSION PREINST POSTINST PRERM POSTRM
+    bashc.readconf "$BUFFER_VARS" SUMMARY URL DESCRIPTION LICENSE PACKAGER DEPENDS REQUIRES PACKAGE VERSION PREINST POSTINST PRERM POSTRM RPM_PRE RPM_PREUN RPM_POST RPM_POSTUN
     return 0
   fi
   return 1
