@@ -41,8 +41,7 @@ EOF
 }
 
 function verify_dependencies() {
-  sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
-  envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
+  return 0
 }
 
 # Some basic includes
@@ -85,7 +84,7 @@ done
 
 verify_dependencies
 
-CONFIGFILES="/etc/default/bashcgen.conf /etc/bashc/bashcgen.conf /etc/bashcgen.conf $HOME/.bashcgen etc/bashcgen.conf"
+CONFIGFILES="/etc/default/bashcgen.conf /etc/bashc/bashcgen.conf /etc/bashcgen.conf $HOME/.bashc/bashcgen.conf etc/bashcgen.conf"
 
 bashc.readconffiles "$CONFIGFILES" BASHCGEN_TEMPLATE_PATH
 
@@ -93,7 +92,8 @@ if [ ! -d "$BASHCGEN_TEMPLATE_PATH" ]; then
   bashc.finalize 1 "the template folder is not valid"
 fi
 
-TEMPLATES_S="$(find "${BASHCGEN_TEMPLATE_PATH}" -maxdepth 1 -mindepth 1 -type d -printf "%P\n")"
+BASHCGEN_TEMPLATE_PATH="${BASHCGEN_TEMPLATE_PATH%/}"
+TEMPLATES_S="$(while read; do echo "${REPLY//*\//}"; done <<< "$(find "${BASHCGEN_TEMPLATE_PATH}" -maxdepth 1 -mindepth 1 -type d )")"
 
 if [ "$LISTTEMPLATES" == "true" ]; then
   p_out "Templates available:"
@@ -136,10 +136,11 @@ if [ -d "$FOLDER" -a "$FOLDEROVERWRITE" != "true" ]; then
 fi
 
 p_debug "creating app $APPNAME in folder $FOLDER"
+TEMPLATE_FOLDER="$BASHCGEN_TEMPLATE_PATH/$TEMPLATE"
 if [ "$MAINAPPONLY" == "true" ]; then
-  FILES="$(find "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE" -mindepth 1 -maxdepth 1 -type f -executable -printf "%P\n" 2> /dev/null)"
+  FILES="$(while read; do echo "${REPLY:${#TEMPLATE_FOLDER}}"; done <<< "$(find "${TEMPLATE_FOLDER}" -mindepth 1 -maxdepth 1 -type f -executable 2> /dev/null)")"
 else
-  FILES="$(find "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE" -mindepth 1 -printf "%P\n" 2> /dev/null)"
+  FILES="$(while read; do echo "${REPLY:${#TEMPLATE_FOLDER}}"; done <<< "$(find "${TEMPLATE_FOLDER}" -mindepth 1 2> /dev/null)")"
 fi
 
 if [ "$FILES" == "" ]; then
@@ -174,7 +175,8 @@ for F in $FILES; do
 
     if [ "$Q_OVERWRITE" == "y" ]; then
       cp "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE/$F" "$FOLDER/$INAPPNAME"
-      sed -i "s/<<APPNAME>>/$APPNAME/g" "$FOLDER/$INAPPNAME"
+      sed -i .toremove "s/<<APPNAME>>/$APPNAME/g" "$FOLDER/$INAPPNAME"
+      rm "$FOLDER/${INAPPNAME}.toremove"
     fi
   fi
 done
