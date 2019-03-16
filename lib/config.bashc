@@ -20,6 +20,16 @@ function bashc.readconffiles() {
   done
 }
 
+if ! which envsubst > /dev/null 2>&1; then
+    function envsubst() {
+        local line
+        while read line; do
+            line=$( echo $line | sed 's/"/\\"/g' )
+            eval echo $line
+        done
+    }
+fi
+
 function bashc.readconffile() {
   local _CONF_FILE="$1"
 
