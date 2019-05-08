@@ -356,7 +356,7 @@ while bashc.parameters_next; do
   n=$(($n+1))
 done
 
-CONFIGFILES="/etc/default/bashc.conf /etc/bashc/bashc.conf /etc/bashc.conf $HOME/.bashc etc/bashc.conf"
+CONFIGFILES="/etc/default/bashc.conf /etc/bashc/bashc.conf /etc/bashc.conf $HOME/.bashc/bashc.conf etc/bashc.conf"
 
 if [ "$FILETOJOIN" == "" ]; then
   bashc.finalize 0 "no input file provided"

@@ -37,7 +37,7 @@ function verify_dependencies() {
 }
 
 # The list of default configuration files (it is set here just in case that you want to change it in the commandline)
-CONFIGFILES="/etc/default/<<APPNAME>>.conf /etc/<<APPNAME>>/<<APPNAME>>.conf /etc/<<APPNAME>>.conf $HOME/.<<APPNAME>> etc/<<APPNAME>>.conf etc/<<APPNAME>>/<<APPNAME>>.conf"
+CONFIGFILES="/etc/default/<<APPNAME>>.conf /etc/<<APPNAME>>/<<APPNAME>>.conf /etc/<<APPNAME>>.conf $HOME/.<<APPNAME>>/<<APPNAME>>.conf etc/<<APPNAME>>.conf etc/<<APPNAME>>/<<APPNAME>>.conf"
 
 # The basic include than gets all from bashc (you should use -S flag to remove the unused functions)
 source all.bashc
