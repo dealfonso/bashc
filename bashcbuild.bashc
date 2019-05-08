@@ -96,40 +96,40 @@ function _deb_scripts() {
   local FOLDER="$1"
 
   # Let's prepare the empty installation scripts
-  local DEFAULT_PREINST="#!/bin/sh
+  local DEFAULT_PREINST='#!/bin/sh
 case $1 in
   install|upgrade|abort-upgrade)    
                     exit 0;;
   *)                exit 1;;
-esac"
+esac'
   local _PREINST="${PREINST:-$DEFAULT_PREINST}"
   echo "$_PREINST" > "${FOLDER}/preinst"
 
-  local DEFAULT_POSTINST="#!/bin/sh
+  local DEFAULT_POSTINST='#!/bin/sh
 case $1 in
   configure|abort-remove|abort-upgrade|abort-deconfigure)    
                     exit 0;;
   *)                exit 1;;
-esac"
+esac'
   local _POSTINST="${POSTINST:-$DEFAULT_POSTINST}"
   echo "$_POSTINST" > "${FOLDER}/postinst"
 
-  local DEFAULT_POSTRM="#!/bin/sh
+  local DEFAULT_POSTRM='#!/bin/sh
 case $1 in
   remove|purge|upgrade|failed-upgrade|abort-install|abort-upgrade)    
                     exit 0;;
   *)                exit 1;;
-esac"
-  local _POSTRM="${POSTRM:-DEFAULT_POSTRM}"
+esac'
+  local _POSTRM="${POSTRM:-$DEFAULT_POSTRM}"
   echo "$_POSTRM" > "${FOLDER}/postrm"
 
-  local DEFAULT_PRERM="#!/bin/sh
+  local DEFAULT_PRERM='#!/bin/sh
 case $1 in
   remove|upgrade|deconfigure|failed-upgrade)    
                     exit 0;;
   *)                exit 1;;
-esac"
-  local _PRERM="${PRERM:-DEFAULT_PRERM}"
+esac'
+  local _PRERM="${PRERM:-$DEFAULT_PRERM}"
   echo "$_PRERM" > "${FOLDER}/prerm"
 
   chmod +x "${FOLDER}/postinst"
