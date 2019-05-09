@@ -97,6 +97,8 @@ function remove_blank_lines() {
       sub(/\[\[:[a-zA-Z]*:\]\]/, "", analized_str);
       while (sub(/\[\[ ([^\[]|\[[^\[])* \]\]/, "[[ ]]", analized_str));
 
+      gsub(/\\./,"", analized_str);
+
       # Remove quoted sentences
       while (sub(/"[^"\\]*(\\.[^"\\]*)*"|'"'"'[^'"'"']*'"'"'/,"",analized_str));
 
@@ -186,6 +188,8 @@ function strip_fnc() {
       # Remove regex
       sub(/\[\[:[a-zA-Z]*:\]\]/, "", analized_str);
       while (sub(/\[\[ ([^\[]|\[[^\[])* \]\]/, "[[ ]]", analized_str));
+
+      gsub(/\\./,"", analized_str);
 
       # Remove quoted sentences
       while (sub(/"[^"\\]*(\\.[^"\\]*)*"|'"'"'[^'"'"']*'"'"'/,"",analized_str));
