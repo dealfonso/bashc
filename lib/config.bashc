@@ -20,15 +20,15 @@ function bashc.readconffiles() {
   done
 }
 
-if ! which envsubst > /dev/null 2>&1; then
+#if ! which envsubst > /dev/null 2>&1; then
     function envsubst() {
         local line
         while read line; do
-            line=$( echo $line | sed 's/"/\\"/g' )
-            eval echo $line
-        done
+            line=$( echo "$line" | sed 's/"/\\"/g' )
+            eval "echo \"${line}\""
+        done <<< "$(cat)"
     }
-fi
+#fi
 
 function bashc.readconffile() {
   local _CONF_FILE="$1"
@@ -50,8 +50,20 @@ function bashc.readconffile() {
   return $?
 }
 
+function __find_section_id() {
+  local i
+  for ((i=0;i<${#BASHC_SECTIONS_AVAILABLE[@]};i=i+1)); do
+    if [ "${BASHC_SECTIONS_AVAILABLE[$i]}" == "$1" ]; then
+      echo $i
+      return 0
+    fi
+  done
+  echo "${1//[[:alpha:]]/}"
+}
+
 function __keyinsection() {
-  local S="${1// /_XX_}"
+  # local S="${1// /_XX_}"
+  local S="$(__find_section_id "$1")"
   local K="$2"
   if [ "$S" != "" ]; then
     K="_CONF_S_${S}_K_$K"
@@ -104,7 +116,15 @@ function bashc.confsectionssetdefault() {
   return 0
 }
 
-function bashc.readconf() {
+function bashc.readconf_toarrays() {
+  local ARR_VARS="$1"
+  local ARR_VALUES="$2"
+  shift
+  shift
+  unset "$ARR_VARS"
+  unset "$ARR_VALUES"
+  local VAR_IDX=0
+
   local _TXT_CONF="$1"
   local _CURRENT_KEY _CURRENT_VALUE
   local L
@@ -117,6 +137,7 @@ function bashc.readconf() {
 
   local _EXITCODE=0
   local MULTILINE_KEY=
+  local MULTILINE_SEP=
   local MULTILINE_BUFFER=
   local _CURRENT_SECTION=
   # Let's read the lines
@@ -124,33 +145,53 @@ function bashc.readconf() {
     L="$REPLY"
     if [ "$MULTILINE_KEY" != "" ]; then
       MULTILINE_BUFFER="${MULTILINE_BUFFER}\n${L}"
-      if [[ "$L" =~ [^\"]*\"[[:blank:]]*$ ]]; then
-        _CURRENT_KEY="$MULTILINE_KEY"
-        _CURRENT_VALUE="$MULTILINE_BUFFER"
-        MULTILINE_KEY=
-        MULTILINE_BUFFER=
-      else
-        continue
+      if [ "$MULTILINE_SEP" == "\"" ]; then
+        if ! [[ "$L" =~ [^\"]*\"[[:blank:]]*$ ]]; then
+          continue
+        fi
       fi
+      if [ "$MULTILINE_SEP" == "'" ]; then
+        if ! [[ "$L" =~ [^\']*\'[[:blank:]]*$ ]]; then
+          continue
+        fi
+      fi
+      _CURRENT_KEY="$MULTILINE_KEY"
+      _CURRENT_VALUE="$MULTILINE_BUFFER"
+      MULTILINE_KEY=
+      MULTILINE_BUFFER=
+      MULTILINE_SEP=
     else
       if [[ "$L" =~ ^[[:blank:]]*\[.*$ ]]; then
         _CURRENT_SECTION="$(bashc.trim "$L")"
         _CURRENT_SECTION="${_CURRENT_SECTION:1:-1}"
-        BASHC_SECTIONS_AVAILABLE=( "${BASHC_SECTIONS_AVAILABLE[@]}" "$_CURRENT_SECTION" )
+        # local I_SECTION=$(eval "echo \${#$ARR_SECTIONS[@]}")
+        # read -d '\0' "$ARR_SECTIONS[$I_SECTION]" <<< "$_CURRENT_SECTION"
+        local I_SECTION=${#BASHC_SECTIONS_AVAILABLE[@]}
+        BASHC_SECTIONS_AVAILABLE[$I_SECTION]="$_CURRENT_SECTION"
+        # BASHC_SECTIONS_AVAILABLE=( "${BASHC_SECTIONS_AVAILABLE[@]}" "$_CURRENT_SECTION" )
         continue
       fi
       if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*=\"[^\"]*$ ]]; then
         IFS='=' read _CURRENT_KEY _CURRENT_VALUE <<< "$L"
         MULTILINE_KEY="$_CURRENT_KEY"
         MULTILINE_BUFFER="$_CURRENT_VALUE"
+        MULTILINE_SEP="\""
         continue
       else
-        if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
+        if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*=\'[^\']*$ ]]; then
           IFS='=' read _CURRENT_KEY _CURRENT_VALUE <<< "$L"
+          MULTILINE_KEY="$_CURRENT_KEY"
+          MULTILINE_BUFFER="$_CURRENT_VALUE"
+          MULTILINE_SEP="'"
+          continue
         else
-          if [ "${L%%\#*}" != "" ]; then
-            p_error "invalid configuration line '$L'"
-            _EXITCODE=$((_EXITCODE+1))
+          if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
+            IFS='=' read _CURRENT_KEY _CURRENT_VALUE <<< "$L"
+          else
+            if [ "${L%%\#*}" != "" ]; then
+              p_error "invalid configuration line '$L'"
+              _EXITCODE=$((_EXITCODE+1))
+            fi
           fi
         fi
       fi
@@ -165,22 +206,26 @@ function bashc.readconf() {
       return $_EXITCODE
     fi
 
+    p_debug "current value: $_CURRENT_VALUE"
     _CURRENT_VALUE="$(bashc.cleanvalue "$_CURRENT_VALUE")"
     if [ $? -ne 0 ]; then
       p_warning "ignoring invalid value $_CURRENT_VALUE for key $_CURRENT_KEY"
       _EXITCODE=$((_EXITCODE+1))
     else
-      _CURRENT_VALUE="$(printf "$_CURRENT_VALUE" | envsubst)"
+      _CURRENT_VALUE="$(printf -- "$_CURRENT_VALUE" | envsubst)"
       if [ ${#_VALID_KEYS[@]} -eq 0 ] || bashc.in_list _VALID_KEYS $_CURRENT_KEY; then
         _CURRENT_KEY="$(__keyinsection "$_CURRENT_SECTION" "$_CURRENT_KEY")"
-        read -d '\0' "$_CURRENT_KEY" <<< "${_CURRENT_VALUE}"
+        # read -d '\0' "$_CURRENT_KEY" <<< "${_CURRENT_VALUE}"
 
         # The value is exported so that it is available for the others subprocesses
-        export $_CURRENT_KEY
+        read -d '\0' "$ARR_VARS[$VAR_IDX]" <<< "$_CURRENT_KEY"
+        read -d '\0' "$ARR_VALUES[$VAR_IDX]" <<< "$_CURRENT_VALUE"
+        VAR_IDX=$((VAR_IDX+1))
+        # export $_CURRENT_KEY
       else
         p_warning "$_CURRENT_KEY ignored"
       fi
-      p_debug "$_CURRENT_KEY=$_CURRENT_VALUE"
+      p_debug "config found: $_CURRENT_KEY=$_CURRENT_VALUE"
       _CURRENT_KEY=
       _CURRENT_VALUE=
     fi
@@ -188,7 +233,55 @@ function bashc.readconf() {
   return $_EXITCODE
 }
 
+function bashc.readconf() {
+  local _BASHC_CONFIG_VALUES=( )
+  local _BASHC_CONFIG_VARS=( )
+  bashc.readconf_toarrays _BASHC_CONFIG_VARS _BASHC_CONFIG_VALUES "$@" 
+
+  local n
+  for ((n=0;n<${#_BASHC_CONFIG_VARS[@]};n++)); do
+    _CURRENT_KEY="${_BASHC_CONFIG_VARS[$n]}"
+    _CURRENT_VALUE="${_BASHC_CONFIG_VALUES[$n]}"
+    read -d '\0' "$_CURRENT_KEY" <<< "${_CURRENT_VALUE}"
+    p_debug "exporting: $_CURRENT_KEY"
+    export $_CURRENT_KEY
+  done
+}
+
 function bashc.cleanvalue() {
+  local A="$1"
+  local VALUE=
+  local STILL_WORKING="true"
+  while [ "$STILL_WORKING" == "true" ]; do
+    STILL_WORKING="false"
+    if [[ "$A" =~ ^[^\#\"\']+ ]]; then
+      VALUE="${VALUE}${BASH_REMATCH[0]}"
+      A="${A:${#BASH_REMATCH[0]}}"
+      STILL_WORKING="true"
+    fi
+    if [ "$STILL_WORKING" == "false" ] && [[ "$A" =~ ^\"([^\"\\]*(\\.[^\"\\]*)*)\" ]]; then
+      VALUE="${VALUE}${BASH_REMATCH[1]}"
+      A="${A:${#BASH_REMATCH[0]}}"
+      STILL_WORKING="true"
+    fi
+    if [ "$STILL_WORKING" == "false" ] && [[ "$A" =~ ^\'([^\']*)\' ]]; then
+      VALUE="${VALUE}${BASH_REMATCH[1]}"
+      A="${A:${#BASH_REMATCH[0]}}"
+      STILL_WORKING="true"
+    fi
+  done
+  echo "$VALUE"
+  A="$(bashc.trim "$A")"
+  if [ "${A:0:1}" == "#" ]; then
+    return 0
+  fi
+  if [ "$A" != "" ]; then
+    return 1
+  fi
+  return 0
+}
+
+function bashc.cleanvalue_working() {
   local A="$1"
   local VALUE=
   local STILL_WORKING="true"
