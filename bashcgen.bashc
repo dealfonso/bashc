@@ -175,7 +175,7 @@ for F in $FILES; do
 
     if [ "$Q_OVERWRITE" == "y" ]; then
       cp "$BASHCGEN_TEMPLATE_PATH/$TEMPLATE/$F" "$FOLDER/$INAPPNAME"
-      sed -i .toremove "s/<<APPNAME>>/$APPNAME/g" "$FOLDER/$INAPPNAME"
+      sed -i.toremove "s/<<APPNAME>>/$APPNAME/g" "$FOLDER/$INAPPNAME"
       rm "$FOLDER/${INAPPNAME}.toremove"
     fi
   fi
