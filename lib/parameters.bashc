@@ -13,6 +13,13 @@ function bashc.parameters_next() {
   return 1
 }
 
+function bashc.parameters_more() {
+  if ((_BASHC_current_param_id<${#_BASHC_COMMANDLINE_ARRAY[@]})); then
+    return 0
+  fi
+  return 1
+}
+
 function bashc.parameters_prev() {
   if ((_BASHC_current_param_id<=0)); then
     return 1
