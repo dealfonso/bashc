@@ -89,7 +89,6 @@ function verify_dependencies() {
   tar --version > /dev/null 2> /dev/null || bashc.finalize 1 "tar not found"
   sed --version > /dev/null 2> /dev/null || bashc.finalize 1 "sed not found"
   gawk --version > /dev/null 2> /dev/null || bashc.finalize 1 "gawk not found"
-  envsubst --version > /dev/null 2> /dev/null || bashc.finalize 1 "envsubst not found (package gettext)"
 }
 
 function _deb_scripts() {
@@ -323,10 +322,12 @@ Now you MUST complete the next steps:
 EOT
 
   # Create a compressed file that contains all these files ready to be built
-  tar cfz "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" -C "${PPA_TMPDIR}/.." "${PACKAGE}_${VERSION}-${REVISION}-ppa"
+  local RES
+  RES="$(tar cfzv "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" --ignore-failed-read -C "${PPA_TMPDIR}/.." "${PACKAGE}_${VERSION}-${REVISION}-ppa" 2>&1)"
   if [ $? -eq 0 ]; then
     echo "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz"
   else
+    p_error "$RES"
     return 1
   fi
 
