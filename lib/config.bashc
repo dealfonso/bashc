@@ -187,6 +187,13 @@ function bashc.readconf_toarrays() {
         else
           if [[ "$L" =~ ^[[:blank:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
             IFS='=' read _CURRENT_KEY _CURRENT_VALUE <<< "$L"
+            _CURRENT_VALUE="$(bashc.trim "$_CURRENT_VALUE")"
+            if [ "${_CURRENT_VALUE::1}" != "\"" -a "${_CURRENT_VALUE: -1}" != "\"" ]; then
+              # If it did not begin and end with quotes, let's assume that it is a whole line string 
+              # and we will quote it (just in case that it has inside-quotes)
+              
+              _CURRENT_VALUE="\"$(echo "$_CURRENT_VALUE" | sed 's/"/\\"/g')\""
+            fi
           else
             if [ "${L%%\#*}" != "" ]; then
               p_error "invalid configuration line '$L'"
