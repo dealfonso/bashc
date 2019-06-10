@@ -234,7 +234,8 @@ function build_ppa() {
 
   p_debug "building package from $BUILDFOLDER"
 
-  local PPA_TMPDIR="${TMPDIR}/ppa/${PACKAGE}_${VERSION}-${REVISION}-ppa"
+  local PPA_FOLDER="${TMPDIR}/ppa"
+  local PPA_TMPDIR="${PPA_FOLDER}/${PACKAGE}_${VERSION}-${REVISION}-ppa"
   mkdir -p "${PPA_TMPDIR}"
 
   cp -r "$BUILDFOLDER" "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}"
@@ -323,9 +324,9 @@ EOT
 
   # Create a compressed file that contains all these files ready to be built
   local RES
-  RES="$(tar cfzv "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" --ignore-failed-read -C "${PPA_TMPDIR}/.." "${PACKAGE}_${VERSION}-${REVISION}-ppa" 2>&1)"
+  RES="$(tar cfzv "${PPA_FOLDER}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz" --ignore-failed-read -C "$(readlink -f "${PPA_TMPDIR}/..")" "${PACKAGE}_${VERSION}-${REVISION}-ppa" 2>&1)"
   if [ $? -eq 0 ]; then
-    echo "${PPA_TMPDIR}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz"
+    echo "${PPA_FOLDER}/${PACKAGE}_${VERSION}-${REVISION}-ppa.tar.gz"
   else
     p_error "$RES"
     return 1
