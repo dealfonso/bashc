@@ -5,8 +5,24 @@ function bashc.parameters_start() {
   _BASHC_current_param_id=-1
 }
 
+_BASHC_PARAMETERS_CHECKPOINT=0
+function bashc.parameters_checkpoint() {
+  _BASHC_PARAMETERS_CHECKPOINT=$_BASHC_current_param_id
+}
+
+function bashc.parameters_tocheckpoint() {
+  _BASHC_current_param_id=$_BASHC_PARAMETERS_CHECKPOINT
+}
+
 function bashc.parameters_next() {
   _BASHC_current_param_id=$((_BASHC_current_param_id+1))
+  if ((_BASHC_current_param_id<${#_BASHC_COMMANDLINE_ARRAY[@]})); then
+    return 0
+  fi
+  return 1
+}
+
+function bashc.parameters_more() {
   if ((_BASHC_current_param_id<${#_BASHC_COMMANDLINE_ARRAY[@]})); then
     return 0
   fi

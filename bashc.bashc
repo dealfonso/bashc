@@ -368,6 +368,8 @@ fi
 
 if [ "$OUTFILE" == "-" ]; then
   OUTFILE=""
+else
+  OUTFILE="$(readlink -f "$OUTFILE")"
 fi
 
 # Change to the working folder (get it from the file, if flag -C is set)
