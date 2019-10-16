@@ -196,7 +196,7 @@ function bashc.expand_ranges() {
   local v PATTERN CONTENT L_LIMIT U_LIMIT
   local RANGE="$(echo "$NAME" | grep -o '\[\([0-9]\{1,\}-[0-9]\{1,\}\|[a-z]-[a-z]\|[A-Z]-[A-Z]\)\]' | head -1)"
   if [ "$RANGE" != "" ]; then
-    RANGE="${RANGE:1:-1}"
+    RANGE="${RANGE:1:${#RANGE}-2}"
     PATTERN="\[${RANGE}\]"
     p_debug "range detected: $RANGE"
     IFS='-' read L_LIMIT U_LIMIT <<< "$RANGE"

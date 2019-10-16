@@ -99,6 +99,16 @@ function bashc.confsectionsget() {
   if [ "$KEY" == "" ]; then return 1; fi
   KEY="$(__keyinsection "$SECTION" "$KEY")"
   echo "${!KEY}"
+  if [ "$KEY" == "$2" ]; then
+    # The section does not exist
+    return 1
+  else
+    # The section exists and we'll check if 
+    if [ "${!KEY+x}" == "" ]; then
+      return 1
+    fi
+  fi 
+  return 0
 }
 
 function bashc.confsectionssetdefault() {
@@ -163,7 +173,7 @@ function bashc.readconf_toarrays() {
     else
       if [[ "$L" =~ ^[[:blank:]]*\[.*$ ]]; then
         _CURRENT_SECTION="$(bashc.trim "$L")"
-        _CURRENT_SECTION="${_CURRENT_SECTION:1:-1}"
+        _CURRENT_SECTION="${_CURRENT_SECTION:1:${#_CURRENT_SECTION}-2}"
         # local I_SECTION=$(eval "echo \${#$ARR_SECTIONS[@]}")
         # read -d '\0' "$ARR_SECTIONS[$I_SECTION]" <<< "$_CURRENT_SECTION"
         local I_SECTION=${#BASHC_SECTIONS_AVAILABLE[@]}
