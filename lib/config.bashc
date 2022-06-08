@@ -163,7 +163,9 @@ function bashc.readconf_toarrays() {
     else
       if [[ "$L" =~ ^[[:blank:]]*\[.*$ ]]; then
         _CURRENT_SECTION="$(bashc.trim "$L")"
-        _CURRENT_SECTION="${_CURRENT_SECTION:1:-1}"
+        # _CURRENT_SECTION="${_CURRENT_SECTION:1:-1}"
+        _CURRENT_SECTION="${_CURRENT_SECTION:1}"
+        _CURRENT_SECTION="${_CURRENT_SECTION%?}"
         # local I_SECTION=$(eval "echo \${#$ARR_SECTIONS[@]}")
         # read -d '\0' "$ARR_SECTIONS[$I_SECTION]" <<< "$_CURRENT_SECTION"
         local I_SECTION=${#BASHC_SECTIONS_AVAILABLE[@]}
